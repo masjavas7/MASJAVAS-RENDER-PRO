@@ -2,7 +2,7 @@
 
 MASJAVAS RENDER PRO is a powerful desktop application featuring a video editor, audio visualizer, karaoke & playlist maker, batch renderer, and audio mastering tools.
 
-Originally built as Sonara, this application has been fully rebranded to **MASJAVAS RENDER PRO (V1.7)** and is ready for production deployment.
+MASJAVAS RENDER PRO (V1.7) is ready for production deployment.
 
 ## Catatan Keamanan
 
@@ -29,7 +29,7 @@ Originally built as Sonara, this application has been fully rebranded to **MASJA
 ## Project Structure
 
 ```
-Sonara-V1.7-portable/
+MASJAVAS-RENDER-PRO/
 │
 └── $PLUGINSDIR/
     ├── nsis7z.dll                    # NSIS extraction helper
