@@ -7261,6 +7261,8 @@ const useApp = create((set, get) => ({
   sidecar: null,
   project: null,
   view: "home",
+  userMode: "beginner",
+  setUserMode: (v2) => set({ userMode: v2 }),
   projectList: [],
   activePanel: "project",
   toasts: [],
@@ -7359,7 +7361,7 @@ const useApp = create((set, get) => ({
   createProject: async (name, mode = "studio") => {
     const project = await window.masjavas.newProject(name, mode);
     const stored = await window.masjavas.storeProject(project);
-    set({ project: stored, view: "editor", activePanel: "media" });
+    set({ project: stored, view: "editor", activePanel: "audio" });
     get().toast("success", `Project "${stored.name}" dibuat.`);
   },
   openProject: async () => {
@@ -7367,7 +7369,7 @@ const useApp = create((set, get) => ({
     if (!paths.length) return;
     try {
       const project = await window.masjavas.openProject(paths[0]);
-      set({ project, view: "editor", activePanel: "media" });
+      set({ project, view: "editor", activePanel: "audio" });
       get().toast("success", `Opened "${project.name}".`);
     } catch (e) {
       get().toast("error", `Failed to open project: ${e.message}`);
@@ -7376,7 +7378,7 @@ const useApp = create((set, get) => ({
   openProjectById: async (id2) => {
     try {
       const project = await window.masjavas.loadProjectById(id2);
-      set({ project, view: "editor", activePanel: "media" });
+      set({ project, view: "editor", activePanel: "audio" });
     } catch (e) {
       get().toast("error", `Failed to open project: ${e.message}`);
     }
@@ -7462,8 +7464,6 @@ function HomeScreen() {
   const deleteProject = useApp((s) => s.deleteProject);
   const loadProjectList = useApp((s) => s.loadProjectList);
   const projectList = useApp((s) => s.projectList);
-  const [creating, setCreating] = reactExports.useState(false);
-  const [name, setName] = reactExports.useState("My Music Video");
   reactExports.useEffect(() => {
     loadProjectList();
   }, [loadProjectList]);
@@ -7471,58 +7471,42 @@ function HomeScreen() {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "home-top", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "home-brand", children: [
         "MASJAVAS ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "v", children: "V1.7" })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "v", children: "RENDER PRO 2026" })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "home-tagline", children: "Video editor · Visualizer · Karaoke · Playlist · Batch render" })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "home-tagline", children: "Video Editor & Visualizer Pro. Mudah digunakan untuk pemula, bertenaga untuk profesional." })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "home-body", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("section", { className: "home-create", children: !creating ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "home-actions", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "action-card primary", onClick: () => setCreating(true), children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-ico", children: "＋" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-title", children: "Buat Project" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-sub", children: "Lirik, playlist, spektrum — semua dalam satu" })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("section", { className: "home-create", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "home-actions", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "action-card primary", onClick: () => createProject("Proyek Video Musik", "studio"), children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-ico", children: "🎵" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-title", children: "Video Musik" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-sub", children: "Gabungkan audio + video latar belakang" })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "action-card", onClick: openProject, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-ico", children: "⤓" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-title", children: "Open Project File…" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-sub", children: "Load an existing .masjavas file" })
-        ] })
-      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card create-card", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "New Project" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Nama project" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              className: "inp",
-              autoFocus: true,
-              value: name,
-              onChange: (e) => setName(e.target.value),
-              onKeyDown: (e) => {
-                if (e.key === "Enter") createProject(name.trim() || "Untitled");
-              }
-            }
-          )
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "action-card primary-purple", onClick: () => createProject("Proyek Karaoke", "lyrics"), children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-ico", children: "🎤" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-title", children: "Karaoke" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-sub", children: "Buat video lirik/karaoke berjalan" })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { style: { margin: "8px 0 18px", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }, children: [
-          "Satu project, semua fitur lewat toggle: aktifkan ",
-          /* @__PURE__ */ jsxRuntimeExports.jsx("b", { children: "Lirik" }),
-          " & ",
-          /* @__PURE__ */ jsxRuntimeExports.jsx("b", { children: "Playlist" }),
-          " di tabnya, pilih ",
-          /* @__PURE__ */ jsxRuntimeExports.jsx("b", { children: "Mode Spektrum" }),
-          " (Statis / Full Reaktif) di tab Spektrum, dan render banyak video lewat antrian di tab Render."
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "action-card primary-cyan", onClick: async () => {
+          await createProject("Proyek Visualizer", "studio");
+          patchProject((p2) => {
+            p2.spectrum.enabled = true;
+            return p2;
+          });
+        }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-ico", children: "📊" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-title", children: "Visualizer" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-sub", children: "Spektrum audio reaktif frekuensi" })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              className: "btn primary",
-              onClick: () => createProject(name.trim() || "Untitled"),
-              children: "Buat Project"
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: () => setCreating(false), children: "Batal" })
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "action-card primary-blue", onClick: () => createProject("Proyek Playlist", "playlist"), children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-ico", children: "📋" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-title", children: "Playlist Video" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-sub", children: "Gabungkan banyak lagu dalam satu video" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "action-card outline", onClick: openProject, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-ico", children: "📂" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-title", children: "Buka Proyek..." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-sub", children: "Pilih file proyek .masjavas dari komputer" })
         ] })
       ] }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "home-history", children: [
@@ -7630,7 +7614,6 @@ function ProjectPanel() {
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", style: { marginTop: 14 }, children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn primary", onClick: saveProject, children: "Simpan Sekarang" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: exportAs, children: "Ekspor .masjavas…" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: () => setView("home"), children: "Beranda" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: closeProject, children: "Tutup Proyek" })
       ] })
     ] })
@@ -8587,7 +8570,22 @@ function LyricsPanel() {
         ly.lines.length,
         " baris)"
       ] }),
-      ly.lines.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "empty", children: 'Belum ada lirik. Gunakan "Hasilkan Lirik" atau impor file di atas.' }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { maxHeight: 420, overflowY: "auto" }, children: [
+      ly.lines.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "empty-state-lyrics", style: { padding: "20px 10px", textAlign: "center", border: "1px dashed var(--border)", borderRadius: 12 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 28, display: "block", marginBottom: 6 }, children: "💬" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h4", { style: { margin: "0 0 4px", fontSize: 13 }, children: "Belum Ada Lirik" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--text-dim)", margin: "0 0 10px", lineHeight: 1.4 }, children: "Tulis lirik secara manual, impor file lirik (.lrc/.srt), atau gunakan Transkripsi AI." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", style: { justifyContent: "center", gap: 6 }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn primary", style: { padding: "4px 10px", fontSize: 11 }, onClick: () => {
+            patchProject((p2) => {
+              p2.lyrics.lines = [{ t: 0, end: 5, text: "Lirik lagu baris pertama..." }];
+              p2.showLyrics = true;
+              return p2;
+            });
+          }, children: "＋ Tulis Manual" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { padding: "4px 10px", fontSize: 11 }, onClick: importLyrics, children: "⤓ Impor" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { padding: "4px 10px", fontSize: 11 }, onClick: autoLyrics, children: "🤖 Transkripsi" })
+        ] })
+      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { maxHeight: 420, overflowY: "auto" }, children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 8, marginBottom: 4, fontSize: 11, color: "var(--muted)" }, children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { width: 70 }, children: "Mulai (s)" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { width: 70 }, children: "Selesai (s)" }),
@@ -13600,6 +13598,7 @@ function pickFootageOrder(project) {
 }
 function RenderPanel() {
   const project = useProject();
+  const userMode = useApp((s) => s.userMode);
   const toast = useApp((s) => s.toast);
   const ffmpeg = useApp((s) => s.ffmpeg);
   const hardware = useApp((s) => s.hardware);
@@ -13699,7 +13698,7 @@ function RenderPanel() {
           "fps"
         ] })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+      userMode === "advanced" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Kualitas & Codec" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Codec video", value: exp.vcodec, options: [{ value: "h264", label: "H.264 — kompatibel luas" }, { value: "h265", label: "H.265 — file lebih kecil" }], onChange: (v2) => patchProject((p2) => (p2.export.vcodec = v2, p2)) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Codec audio", value: exp.acodec, options: [{ value: "aac", label: "AAC — standar streaming" }, { value: "wav", label: "WAV — lossless" }], onChange: (v2) => patchProject((p2) => (p2.export.acodec = v2, p2)) }),
@@ -13708,7 +13707,7 @@ function RenderPanel() {
         exp.bitrate !== "auto" && /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Bitrate (kbps)", min: 1e3, max: 4e4, step: 500, value: exp.bitrate, onChange: (v2) => patchProject((p2) => (p2.export.bitrate = v2, p2)) })
       ] })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+    userMode === "advanced" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Audio" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         Slider,
@@ -13765,7 +13764,7 @@ function RenderPanel() {
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "soon", children: `Menggabungkan ${project.audio.mergeCount === 0 ? project.audio.items.length : project.audio.mergeCount} lagu menjadi 1 video${project.audio.customDuration ? `, durasi ${project.audio.targetMinutes} menit` : ""}.` })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+    userMode === "advanced" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Batch Render" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         Toggle,
@@ -13829,7 +13828,7 @@ function RenderPanel() {
       ] }, it.id)),
       queue.items.some((i) => i.status === "waiting" || i.status === "rendering") && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "btn-row", style: { marginTop: 10 }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: () => window.masjavas.clearRenderQueue(), children: "Batalkan Semua Antrian" }) })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+    userMode === "advanced" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Pemrosesan Audio" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "soon", style: { fontSize: 11 }, children: "Diterapkan per lagu sebelum digabung — mastering, fade in/out, lalu gabung." }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -13980,280 +13979,283 @@ function SettingsPanel() {
       /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { children: "Pengaturan" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Tampilan, encoder video, dan status layanan." })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid2", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Tampilan" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Tema" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: ["dark", "light"].map((t2) => /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: settings.theme === t2 ? "on" : "", onClick: () => update({ theme: t2 }), children: t2 === "dark" ? "Gelap" : "Terang" }, t2)) })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Warna aksen" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "swatches", children: Object.keys(ACCENTS).map((a) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "div",
-            {
-              className: `swatch ${settings.accent === a ? "sel" : ""}`,
-              style: { background: ACCENTS[a].hex },
-              title: ACCENTS[a].name,
-              onClick: () => update({ accent: a })
-            },
-            a
-          )) })
-        ] })
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Tampilan" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Tema" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: ["dark", "light"].map((t2) => /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: settings.theme === t2 ? "on" : "", onClick: () => update({ theme: t2 }), children: t2 === "dark" ? "Gelap" : "Terang" }, t2)) })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Encoder Render" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Preferensi encoder (otomatis pilih GPU terbaik yang tersedia)" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "select",
-            {
-              className: "inp",
-              value: settings.encoderPreference,
-              onChange: (e) => update({ encoderPreference: e.target.value }),
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "auto", children: "Otomatis" }),
-                hardware?.encoders.map((enc) => /* @__PURE__ */ jsxRuntimeExports.jsxs("option", { value: enc.id, disabled: !enc.available, children: [
-                  enc.label,
-                  enc.available ? "" : " (tidak tersedia)"
-                ] }, enc.id))
-              ]
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-row", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Encoder aktif" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "val", children: hardware?.selectedEncoder ?? "—" })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", style: { marginTop: 12 }, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Mode kualitas (bitrate otomatis)" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: ["low", "balanced", "high"].map((q2) => /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: settings.qualityMode === q2 ? "on" : "", onClick: () => update({ qualityMode: q2 }), children: qualityLabel(q2) }, q2)) })
-        ] })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Warna aksen" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "swatches", children: Object.keys(ACCENTS).map((a) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "div",
+          {
+            className: `swatch ${settings.accent === a ? "sel" : ""}`,
+            style: { background: ACCENTS[a].hex },
+            title: ACCENTS[a].name,
+            onClick: () => update({ accent: a })
+          },
+          a
+        )) })
       ] })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Manage API Key — Groq AI" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10 }, children: [
-        "Groq menggunakan model ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "whisper-large-v3-turbo" }),
-        " via cloud — lebih cepat dan akurat dari WhisperX lokal. API key disimpan di komputer ini secara aman.",
-        " ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("a", { href: GROQ_CONSOLE_URL, target: "_blank", rel: "noreferrer", style: { color: "var(--accent)" }, children: "Dapatkan API key gratis →" })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Provider transkripsi lirik" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: ["whisper", "groq"].map((p2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: settings.transcribeProvider === p2 ? "on" : "",
-            onClick: () => update({ transcribeProvider: p2 }),
-            children: p2 === "whisper" ? "WhisperX (lokal)" : "Groq (cloud)"
-          },
-          p2
-        )) })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", style: { marginTop: 10 }, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Groq API Key" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 6, alignItems: "center" }, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              className: "inp",
-              type: showGroqKey ? "text" : "password",
-              placeholder: "gsk_…",
-              style: { flex: 1, fontFamily: "monospace", fontSize: 12 },
-              value: groqKeyInput ?? settings.groqApiKey,
-              onChange: (e) => {
-                setGroqKeyInput(e.target.value);
-                setGroqKeySaved(false);
-                setGroqTestStatus(null);
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("details", { className: "adv-details", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("summary", { children: "Tampilkan Pengaturan Lanjutan (Developer Settings)" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: 10 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Encoder Render" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Preferensi encoder (otomatis pilih GPU terbaik yang tersedia)" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "select",
+              {
+                className: "inp",
+                value: settings.encoderPreference,
+                onChange: (e) => update({ encoderPreference: e.target.value }),
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "auto", children: "Otomatis" }),
+                  hardware?.encoders.map((enc) => /* @__PURE__ */ jsxRuntimeExports.jsxs("option", { value: enc.id, disabled: !enc.available, children: [
+                    enc.label,
+                    enc.available ? "" : " (tidak tersedia)"
+                  ] }, enc.id))
+                ]
               }
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { padding: "4px 10px", fontSize: 11 }, onClick: () => setShowGroqKey((v2) => !v2), children: showGroqKey ? "Sembunyikan" : "Tampilkan" })
-        ] })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", style: { marginTop: 12 }, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: "btn primary",
-            style: { padding: "4px 12px", fontSize: 11 },
-            disabled: groqKeyInput === null || groqKeyInput === settings.groqApiKey,
-            onClick: async () => {
-              await update({ groqApiKey: groqKeyInput ?? "" });
-              setGroqKeySaved(true);
-              setGroqTestStatus(null);
-              toast("success", "Groq API key disimpan.");
-            },
-            children: groqKeySaved ? "✓ Tersimpan" : "Simpan"
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: "btn",
-            style: { padding: "4px 12px", fontSize: 11 },
-            disabled: groqTesting,
-            onClick: async () => {
-              const currentKey = groqKeyInput ?? settings.groqApiKey;
-              if (!currentKey) {
-                toast("error", "API key kosong.");
-                return;
-              }
-              setGroqTesting(true);
-              setGroqTestStatus(null);
-              try {
-                const res = await window.masjavas.groqTestConnection(currentKey);
-                setGroqTesting(false);
-                if (res.ok) {
-                  setGroqTestStatus({ ok: true, msg: "Koneksi Berhasil: API Merespons OK" });
-                  toast("success", "Koneksi Groq sukses!");
-                } else {
-                  setGroqTestStatus({ ok: false, msg: `Koneksi Gagal: ${res.error || "Unknown error"}` });
-                  toast("error", "Koneksi Groq gagal.");
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-row", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Encoder aktif" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "val", children: hardware?.selectedEncoder ?? "—" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", style: { marginTop: 12 }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Mode kualitas (bitrate otomatis)" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: ["low", "balanced", "high"].map((q2) => /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: settings.qualityMode === q2 ? "on" : "", onClick: () => update({ qualityMode: q2 }), children: qualityLabel(q2) }, q2)) })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Manage API Key — Groq AI" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10 }, children: [
+            "Groq menggunakan model ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "whisper-large-v3-turbo" }),
+            " via cloud — lebih cepat dan akurat dari WhisperX lokal. API key disimpan di komputer ini secara aman.",
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("a", { href: GROQ_CONSOLE_URL, target: "_blank", rel: "noreferrer", style: { color: "var(--accent)" }, children: "Dapatkan API key gratis →" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Provider transkripsi lirik" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: ["whisper", "groq"].map((p2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: settings.transcribeProvider === p2 ? "on" : "",
+                onClick: () => update({ transcribeProvider: p2 }),
+                children: p2 === "whisper" ? "WhisperX (lokal)" : "Groq (cloud)"
+              },
+              p2
+            )) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", style: { marginTop: 10 }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Groq API Key" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 6, alignItems: "center" }, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "input",
+                {
+                  className: "inp",
+                  type: showGroqKey ? "text" : "password",
+                  placeholder: "gsk_…",
+                  style: { flex: 1, fontFamily: "monospace", fontSize: 12 },
+                  value: groqKeyInput ?? settings.groqApiKey,
+                  onChange: (e) => {
+                    setGroqKeyInput(e.target.value);
+                    setGroqKeySaved(false);
+                    setGroqTestStatus(null);
+                  }
                 }
-              } catch (e) {
-                setGroqTesting(false);
-                setGroqTestStatus({ ok: false, msg: `Koneksi Gagal: ${e.message}` });
-                toast("error", `Koneksi Groq gagal: ${e.message}`);
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { padding: "4px 10px", fontSize: 11 }, onClick: () => setShowGroqKey((v2) => !v2), children: showGroqKey ? "Sembunyikan" : "Tampilkan" })
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", style: { marginTop: 12 }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "btn primary",
+                style: { padding: "4px 12px", fontSize: 11 },
+                disabled: groqKeyInput === null || groqKeyInput === settings.groqApiKey,
+                onClick: async () => {
+                  await update({ groqApiKey: groqKeyInput ?? "" });
+                  setGroqKeySaved(true);
+                  setGroqTestStatus(null);
+                  toast("success", "Groq API key disimpan.");
+                },
+                children: groqKeySaved ? "✓ Tersimpan" : "Simpan"
               }
-            },
-            children: groqTesting ? "Menguji…" : "Uji Koneksi"
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: "btn danger",
-            style: { padding: "4px 12px", fontSize: 11, backgroundColor: "#551a1a", color: "#ff9999" },
-            disabled: !(groqKeyInput ?? settings.groqApiKey),
-            onClick: async () => {
-              if (confirm("Hapus Groq API key?")) {
-                await update({ groqApiKey: "" });
-                setGroqKeyInput("");
-                setGroqKeySaved(false);
-                setGroqTestStatus(null);
-                toast("success", "Groq API key dihapus.");
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "btn",
+                style: { padding: "4px 12px", fontSize: 11 },
+                disabled: groqTesting,
+                onClick: async () => {
+                  const currentKey = groqKeyInput ?? settings.groqApiKey;
+                  if (!currentKey) {
+                    toast("error", "API key kosong.");
+                    return;
+                  }
+                  setGroqTesting(true);
+                  setGroqTestStatus(null);
+                  try {
+                    const res = await window.masjavas.groqTestConnection(currentKey);
+                    setGroqTesting(false);
+                    if (res.ok) {
+                      setGroqTestStatus({ ok: true, msg: "Koneksi Berhasil: API Merespons OK" });
+                      toast("success", "Koneksi Groq sukses!");
+                    } else {
+                      setGroqTestStatus({ ok: false, msg: `Koneksi Gagal: ${res.error || "Unknown error"}` });
+                      toast("error", "Koneksi Groq gagal.");
+                    }
+                  } catch (e) {
+                    setGroqTesting(false);
+                    setGroqTestStatus({ ok: false, msg: `Koneksi Gagal: ${e.message}` });
+                    toast("error", `Koneksi Groq gagal: ${e.message}`);
+                  }
+                },
+                children: groqTesting ? "Menguji…" : "Uji Koneksi"
               }
-            },
-            children: "Hapus API Key"
-          }
-        )
-      ] }),
-      groqTestStatus && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: groqTestStatus.ok ? "var(--good, #4c4)" : "var(--bad, #f66)", marginTop: 6 }, children: groqTestStatus.msg }),
-      settings.groqApiKey && !groqTestStatus && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--good, #4c4)", marginTop: 6 }, children: "✓ API key tersimpan — Groq siap digunakan." }),
-      !settings.groqApiKey && settings.transcribeProvider === "groq" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--bad, #f66)", marginTop: 6 }, children: "⚠ Provider diset ke Groq tapi API key belum diisi." })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Telegram — Notifikasi Render" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10, lineHeight: 1.5 }, children: [
-        "Kirim pesan otomatis ke Telegram tiap render selesai (nama file, durasi, sisa batch & antrian project). Disimpan di komputer ini — tidak perlu isi ulang.",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("br", {}),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "Cara dapat:" }),
-        " chat ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("a", { href: "https://t.me/BotFather", target: "_blank", rel: "noreferrer", style: { color: "var(--accent)" }, children: "@BotFather" }),
-        " → ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "/newbot" }),
-        " → salin ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "bot token" }),
-        ". Lalu chat ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("a", { href: "https://t.me/userinfobot", target: "_blank", rel: "noreferrer", style: { color: "var(--accent)" }, children: "@userinfobot" }),
-        " untuk dapat ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "Chat ID" }),
-        " kamu. Kirim dulu 1 pesan ke bot-mu biar bot boleh balas."
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Aktifkan notifikasi Telegram" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: [["Nyala", true], ["Mati", false]].map(([label, val]) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: settings.telegramEnabled === val ? "on" : "",
-            onClick: () => update({ telegramEnabled: val }),
-            children: label
-          },
-          label
-        )) })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", style: { marginTop: 10 }, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Bot Token" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 6, alignItems: "center" }, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              className: "inp",
-              type: showTgToken ? "text" : "password",
-              placeholder: "123456789:ABCdef…",
-              style: { flex: 1, fontFamily: "monospace", fontSize: 12 },
-              value: tgToken ?? settings.telegramBotToken,
-              onChange: (e) => {
-                setTgToken(e.target.value);
-                setTgSaved(false);
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "btn danger",
+                style: { padding: "4px 12px", fontSize: 11, backgroundColor: "#551a1a", color: "#ff9999" },
+                disabled: !(groqKeyInput ?? settings.groqApiKey),
+                onClick: async () => {
+                  if (confirm("Hapus Groq API key?")) {
+                    await update({ groqApiKey: "" });
+                    setGroqKeyInput("");
+                    setGroqKeySaved(false);
+                    setGroqTestStatus(null);
+                    toast("success", "Groq API key dihapus.");
+                  }
+                },
+                children: "Hapus API Key"
               }
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { padding: "4px 10px", fontSize: 11 }, onClick: () => setShowTgToken((v2) => !v2), children: showTgToken ? "Sembunyikan" : "Tampilkan" })
+            )
+          ] }),
+          groqTestStatus && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: groqTestStatus.ok ? "var(--good, #4c4)" : "var(--bad, #f66)", marginTop: 6 }, children: groqTestStatus.msg }),
+          settings.groqApiKey && !groqTestStatus && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--good, #4c4)", marginTop: 6 }, children: "✓ API key tersimpan — Groq siap digunakan." }),
+          !settings.groqApiKey && settings.transcribeProvider === "groq" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--bad, #f66)", marginTop: 6 }, children: "⚠ Provider diset ke Groq tapi API key belum diisi." })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Telegram — Notifikasi Render" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10, lineHeight: 1.5 }, children: [
+            "Kirim pesan otomatis ke Telegram tiap render selesai (nama file, durasi, sisa batch & antrian project). Disimpan di komputer ini — tidak perlu isi ulang.",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("br", {}),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "Cara dapat:" }),
+            " chat ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("a", { href: "https://t.me/BotFather", target: "_blank", rel: "noreferrer", style: { color: "var(--accent)" }, children: "@BotFather" }),
+            " → ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("code", { children: "/newbot" }),
+            " → salin ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "bot token" }),
+            ". Lalu chat ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("a", { href: "https://t.me/userinfobot", target: "_blank", rel: "noreferrer", style: { color: "var(--accent)" }, children: "@userinfobot" }),
+            " untuk dapat ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "Chat ID" }),
+            " kamu. Kirim dulu 1 pesan ke bot-mu biar bot boleh balas."
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Aktifkan notifikasi Telegram" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: [["Nyala", true], ["Mati", false]].map(([label, val]) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: settings.telegramEnabled === val ? "on" : "",
+                onClick: () => update({ telegramEnabled: val }),
+                children: label
+              },
+              label
+            )) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", style: { marginTop: 10 }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Bot Token" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 6, alignItems: "center" }, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "input",
+                {
+                  className: "inp",
+                  type: showTgToken ? "text" : "password",
+                  placeholder: "123456789:ABCdef…",
+                  style: { flex: 1, fontFamily: "monospace", fontSize: 12 },
+                  value: tgToken ?? settings.telegramBotToken,
+                  onChange: (e) => {
+                    setTgToken(e.target.value);
+                    setTgSaved(false);
+                  }
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { padding: "4px 10px", fontSize: 11 }, onClick: () => setShowTgToken((v2) => !v2), children: showTgToken ? "Sembunyikan" : "Tampilkan" })
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", style: { marginTop: 10 }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Chat ID" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "inp",
+                placeholder: "mis. 123456789",
+                style: { fontFamily: "monospace", fontSize: 12 },
+                value: tgChat ?? settings.telegramChatId,
+                onChange: (e) => {
+                  setTgChat(e.target.value);
+                  setTgSaved(false);
+                }
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", style: { marginTop: 12 }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "btn primary",
+                style: { padding: "4px 12px", fontSize: 11 },
+                disabled: tgToken === null && tgChat === null || (tgToken ?? settings.telegramBotToken) === settings.telegramBotToken && (tgChat ?? settings.telegramChatId) === settings.telegramChatId,
+                onClick: async () => {
+                  await update({
+                    telegramBotToken: tgToken ?? settings.telegramBotToken,
+                    telegramChatId: tgChat ?? settings.telegramChatId
+                  });
+                  setTgSaved(true);
+                  toast("success", "Pengaturan Telegram disimpan.");
+                },
+                children: tgSaved ? "✓ Tersimpan" : "Simpan"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "btn",
+                style: { padding: "4px 12px", fontSize: 11 },
+                disabled: tgTesting,
+                onClick: async () => {
+                  if (tgToken !== null && tgToken !== settings.telegramBotToken || tgChat !== null && tgChat !== settings.telegramChatId) {
+                    await update({
+                      telegramBotToken: tgToken ?? settings.telegramBotToken,
+                      telegramChatId: tgChat ?? settings.telegramChatId
+                    });
+                    setTgSaved(true);
+                  }
+                  setTgTesting(true);
+                  const res = await window.masjavas.telegramTest();
+                  setTgTesting(false);
+                  toast(res.ok ? "success" : "error", res.ok ? "Pesan tes terkirim ke Telegram." : `Gagal: ${res.error}`);
+                },
+                children: tgTesting ? "Mengirim…" : "Kirim Tes"
+              }
+            )
+          ] }),
+          settings.telegramEnabled && (!settings.telegramBotToken || !settings.telegramChatId) && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--bad, #f66)", marginTop: 6 }, children: "⚠ Notifikasi nyala tapi Bot Token / Chat ID belum lengkap." })
         ] })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", style: { marginTop: 10 }, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Chat ID" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "input",
-          {
-            className: "inp",
-            placeholder: "mis. 123456789",
-            style: { fontFamily: "monospace", fontSize: 12 },
-            value: tgChat ?? settings.telegramChatId,
-            onChange: (e) => {
-              setTgChat(e.target.value);
-              setTgSaved(false);
-            }
-          }
-        )
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", style: { marginTop: 12 }, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: "btn primary",
-            style: { padding: "4px 12px", fontSize: 11 },
-            disabled: tgToken === null && tgChat === null || (tgToken ?? settings.telegramBotToken) === settings.telegramBotToken && (tgChat ?? settings.telegramChatId) === settings.telegramChatId,
-            onClick: async () => {
-              await update({
-                telegramBotToken: tgToken ?? settings.telegramBotToken,
-                telegramChatId: tgChat ?? settings.telegramChatId
-              });
-              setTgSaved(true);
-              toast("success", "Pengaturan Telegram disimpan.");
-            },
-            children: tgSaved ? "✓ Tersimpan" : "Simpan"
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: "btn",
-            style: { padding: "4px 12px", fontSize: 11 },
-            disabled: tgTesting,
-            onClick: async () => {
-              if (tgToken !== null && tgToken !== settings.telegramBotToken || tgChat !== null && tgChat !== settings.telegramChatId) {
-                await update({
-                  telegramBotToken: tgToken ?? settings.telegramBotToken,
-                  telegramChatId: tgChat ?? settings.telegramChatId
-                });
-                setTgSaved(true);
-              }
-              setTgTesting(true);
-              const res = await window.masjavas.telegramTest();
-              setTgTesting(false);
-              toast(res.ok ? "success" : "error", res.ok ? "Pesan tes terkirim ke Telegram." : `Gagal: ${res.error}`);
-            },
-            children: tgTesting ? "Mengirim…" : "Kirim Tes"
-          }
-        )
-      ] }),
-      settings.telegramEnabled && (!settings.telegramBotToken || !settings.telegramChatId) && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--bad, #f66)", marginTop: 6 }, children: "⚠ Notifikasi nyala tapi Bot Token / Chat ID belum lengkap." })
-    ] }),
+      ] })
+    ] }),,
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Status Sistem" }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-row", children: [
@@ -14377,6 +14379,8 @@ function App() {
   const ffmpeg = useApp((s) => s.ffmpeg);
   useApp((s) => s.sidecar);
   const isRendering = useApp((s) => s.isRendering);
+  const userMode = useApp((s) => s.userMode);
+  const setUserMode = useApp((s) => s.setUserMode);
   const [wizardDismissed, setWizardDismissed] = reactExports.useState(
     () => localStorage.getItem(WIZARD_DISMISSED_KEY) === "1"
   );
@@ -14421,7 +14425,13 @@ function App() {
       /* @__PURE__ */ jsxRuntimeExports.jsx(Toasts, {})
     ] });
   }
-  const visibleTabs = TABS.filter((t2) => !t2.modes || t2.modes.includes(project.mode));
+  const beginnerTabIds = ["audio", "media", "lyrics", "spectrum", "render"];
+  const visibleTabs = TABS.filter((t2) => {
+    if (userMode === "beginner") {
+      return beginnerTabIds.includes(t2.id);
+    }
+    return !t2.modes || t2.modes.includes(project.mode);
+  });
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "topbar", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "brand", children: [
@@ -14430,8 +14440,28 @@ function App() {
       ] }),
       project && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mode-badge", children: project.mode }),
       project && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "proj-name", children: project.name }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("button", {
+        className: `mode-toggle-btn ${userMode === "beginner" ? "beg" : ""}`,
+        onClick: () => {
+          const nextMode = userMode === "beginner" ? "advanced" : "beginner";
+          setUserMode(nextMode);
+          if (nextMode === "beginner" && !beginnerTabIds.includes(activePanel)) {
+            setPanel("audio");
+          }
+        },
+        style: { marginLeft: 8 },
+        children: userMode === "beginner" ? [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { marginRight: 4 }, children: "🐣" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Mode Pemula" })
+        ] : [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { marginRight: 4 }, children: "🛠" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Mode Lanjutan" })
+        ]
+      }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "spacer" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: saveProject, style: { padding: "5px 14px", fontSize: 12 }, children: "Simpan" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "save-indicator", children: "Tersimpan otomatis" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: saveProject, style: { padding: "5px 14px", fontSize: 12, marginRight: 8 }, children: "Simpan" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "render-header-btn", onClick: () => setPanel("render"), children: "Ekspor Video ▶" }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "proj-name", style: { fontSize: 11 }, children: [
         appInfo?.platform,
         " ",
@@ -14475,7 +14505,39 @@ function App() {
       ] })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "shell", style: { gridTemplateColumns: `${leftW}px 4px 1fr` }, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "left-col", children: /* @__PURE__ */ jsxRuntimeExports.jsx(ActivePanel, {}) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "left-col", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(ActivePanel, {}),
+        userMode === "beginner" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "wizard-nav-panel", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", {
+            className: "btn",
+            disabled: activePanel === "audio",
+            onClick: () => {
+              const prevMap = {
+                media: "audio",
+                lyrics: "media",
+                spectrum: "lyrics",
+                render: "spectrum"
+              };
+              if (prevMap[activePanel]) setPanel(prevMap[activePanel]);
+            },
+            children: "← Sebelumnya"
+          }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", {
+            className: "btn primary",
+            disabled: activePanel === "render",
+            onClick: () => {
+              const nextMap = {
+                audio: "media",
+                media: "lyrics",
+                lyrics: "spectrum",
+                spectrum: "render"
+              };
+              if (nextMap[activePanel]) setPanel(nextMap[activePanel]);
+            },
+            children: "Selanjutnya →"
+          })
+        ] })
+      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "div",
         {
