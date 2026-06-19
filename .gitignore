@@ -1,0 +1,23 @@
+# Node Modules
+**/node_modules/
+
+# Environment and secrets
+.env
+.env.*
+secrets/
+credentials/
+*.credential
+*.key
+*.pem
+
+# Temp files and build cache
+tmp/
+temp/
+*.log
+.eslintcache
+.parcel-cache
+.cache/
+
+# OS specific files
+.DS_Store
+Thumbs.db
