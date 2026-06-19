@@ -69,4 +69,4 @@ To modify the code:
 
 ## License and Author
 
-Created by **Budiman YB**. Rebranded and maintained as **MASJAVAS**.
+Created by **MASJAVAS**.
