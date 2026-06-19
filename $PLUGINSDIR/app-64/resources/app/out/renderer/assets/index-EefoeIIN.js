@@ -8272,7 +8272,7 @@ function LyricsPanel() {
         const per = dur / lines.length;
         lines = lines.map((l2, i) => ({ t: i * per, end: (i + 1) * per, text: l2.text }));
       }
-      patchProject((p2) => (p2.lyrics.file = sel[0], p2.lyrics.lines = lines, p2));
+      patchProject((p2) => (p2.lyrics.file = sel[0], p2.lyrics.lines = lines, p2.showLyrics = true, p2));
       toast("success", `${lines.length} baris lirik berhasil dimuat.`);
     } catch (e) {
       toast("error", e.message);
@@ -8310,13 +8310,13 @@ function LyricsPanel() {
           const ok2 = mapped.filter((r2) => r2.lines.length > 0).length;
           toast(ok2 > 0 ? "success" : "error", `${ok2}/${paths.length} track berhasil ditranskrip.`);
           const first = mapped.find((r2) => r2.lines.length > 0);
-          if (first) patchProject((p2) => (p2.lyrics.lines = first.lines, p2.lyrics.file = first.path, p2));
+          if (first) patchProject((p2) => (p2.lyrics.lines = first.lines, p2.lyrics.file = first.path, p2.showLyrics = true, p2));
         } else {
           const r2 = mapped[0];
           if (!r2.lines.length) {
             toast("info", r2.error ? `Groq error: ${r2.error}` : "Vokal tidak terdeteksi. Coba rekaman yang lebih bersih atau ubah bahasa.");
           } else {
-            patchProject((p2) => (p2.lyrics.lines = r2.lines, p2.lyrics.file = r2.path, p2));
+            patchProject((p2) => (p2.lyrics.lines = r2.lines, p2.lyrics.file = r2.path, p2.showLyrics = true, p2));
             toast("success", `${r2.lines.length} baris lirik berhasil dihasilkan via Groq.`);
           }
         }
@@ -8344,7 +8344,7 @@ function LyricsPanel() {
         setTranscribeStatus("");
         return;
       }
-      patchProject((p2) => (p2.lyrics.lines = res.lines, p2.lyrics.file = audio.path, p2));
+      patchProject((p2) => (p2.lyrics.lines = res.lines, p2.lyrics.file = audio.path, p2.showLyrics = true, p2));
       toast("success", `${res.lines.length} baris lirik berhasil dihasilkan.`);
       setTranscribeStatus("");
     } catch (e) {
@@ -13966,6 +13966,8 @@ function SettingsPanel() {
   const [groqKeyInput, setGroqKeyInput] = reactExports.useState(null);
   const [groqKeySaved, setGroqKeySaved] = reactExports.useState(false);
   const [showGroqKey, setShowGroqKey] = reactExports.useState(false);
+  const [groqTesting, setGroqTesting] = reactExports.useState(false);
+  const [groqTestStatus, setGroqTestStatus] = reactExports.useState(null);
   const [tgToken, setTgToken] = reactExports.useState(null);
   const [tgChat, setTgChat] = reactExports.useState(null);
   const [tgSaved, setTgSaved] = reactExports.useState(false);
@@ -14030,11 +14032,11 @@ function SettingsPanel() {
       ] })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Groq AI — Transkripsi Lirik" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Manage API Key — Groq AI" }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10 }, children: [
         "Groq menggunakan model ",
         /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "whisper-large-v3-turbo" }),
-        " via cloud — lebih cepat dan akurat dari WhisperX lokal. API key disimpan di komputer ini dan tidak perlu dimasukkan ulang setelah ditutup.",
+        " via cloud — lebih cepat dan akurat dari WhisperX lokal. API key disimpan di komputer ini secara aman.",
         " ",
         /* @__PURE__ */ jsxRuntimeExports.jsx("a", { href: GROQ_CONSOLE_URL, target: "_blank", rel: "noreferrer", style: { color: "var(--accent)" }, children: "Dapatkan API key gratis →" })
       ] }),
@@ -14064,28 +14066,84 @@ function SettingsPanel() {
               onChange: (e) => {
                 setGroqKeyInput(e.target.value);
                 setGroqKeySaved(false);
+                setGroqTestStatus(null);
               }
             }
           ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { padding: "4px 10px", fontSize: 11 }, onClick: () => setShowGroqKey((v2) => !v2), children: showGroqKey ? "Sembunyikan" : "Tampilkan" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              className: "btn primary",
-              style: { padding: "4px 12px", fontSize: 11 },
-              disabled: groqKeyInput === null || groqKeyInput === settings.groqApiKey,
-              onClick: async () => {
-                await update({ groqApiKey: groqKeyInput ?? "" });
-                setGroqKeySaved(true);
-                toast("success", "Groq API key disimpan.");
-              },
-              children: groqKeySaved ? "✓ Tersimpan" : "Simpan"
-            }
-          )
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { padding: "4px 10px", fontSize: 11 }, onClick: () => setShowGroqKey((v2) => !v2), children: showGroqKey ? "Sembunyikan" : "Tampilkan" })
         ] })
       ] }),
-      settings.groqApiKey && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--good, #4c4)", marginTop: 4 }, children: "✓ API key tersimpan — Groq siap digunakan di panel Lirik." }),
-      !settings.groqApiKey && settings.transcribeProvider === "groq" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--bad, #f66)", marginTop: 4 }, children: "⚠ Provider diset ke Groq tapi API key belum diisi." })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", style: { marginTop: 12 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            className: "btn primary",
+            style: { padding: "4px 12px", fontSize: 11 },
+            disabled: groqKeyInput === null || groqKeyInput === settings.groqApiKey,
+            onClick: async () => {
+              await update({ groqApiKey: groqKeyInput ?? "" });
+              setGroqKeySaved(true);
+              setGroqTestStatus(null);
+              toast("success", "Groq API key disimpan.");
+            },
+            children: groqKeySaved ? "✓ Tersimpan" : "Simpan"
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            className: "btn",
+            style: { padding: "4px 12px", fontSize: 11 },
+            disabled: groqTesting,
+            onClick: async () => {
+              const currentKey = groqKeyInput ?? settings.groqApiKey;
+              if (!currentKey) {
+                toast("error", "API key kosong.");
+                return;
+              }
+              setGroqTesting(true);
+              setGroqTestStatus(null);
+              try {
+                const res = await window.masjavas.groqTestConnection(currentKey);
+                setGroqTesting(false);
+                if (res.ok) {
+                  setGroqTestStatus({ ok: true, msg: "Koneksi Berhasil: API Merespons OK" });
+                  toast("success", "Koneksi Groq sukses!");
+                } else {
+                  setGroqTestStatus({ ok: false, msg: `Koneksi Gagal: ${res.error || "Unknown error"}` });
+                  toast("error", "Koneksi Groq gagal.");
+                }
+              } catch (e) {
+                setGroqTesting(false);
+                setGroqTestStatus({ ok: false, msg: `Koneksi Gagal: ${e.message}` });
+                toast("error", `Koneksi Groq gagal: ${e.message}`);
+              }
+            },
+            children: groqTesting ? "Menguji…" : "Uji Koneksi"
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            className: "btn danger",
+            style: { padding: "4px 12px", fontSize: 11, backgroundColor: "#551a1a", color: "#ff9999" },
+            disabled: !(groqKeyInput ?? settings.groqApiKey),
+            onClick: async () => {
+              if (confirm("Hapus Groq API key?")) {
+                await update({ groqApiKey: "" });
+                setGroqKeyInput("");
+                setGroqKeySaved(false);
+                setGroqTestStatus(null);
+                toast("success", "Groq API key dihapus.");
+              }
+            },
+            children: "Hapus API Key"
+          }
+        )
+      ] }),
+      groqTestStatus && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: groqTestStatus.ok ? "var(--good, #4c4)" : "var(--bad, #f66)", marginTop: 6 }, children: groqTestStatus.msg }),
+      settings.groqApiKey && !groqTestStatus && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--good, #4c4)", marginTop: 6 }, children: "✓ API key tersimpan — Groq siap digunakan." }),
+      !settings.groqApiKey && settings.transcribeProvider === "groq" && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--bad, #f66)", marginTop: 6 }, children: "⚠ Provider diset ke Groq tapi API key belum diisi." })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Telegram — Notifikasi Render" }),

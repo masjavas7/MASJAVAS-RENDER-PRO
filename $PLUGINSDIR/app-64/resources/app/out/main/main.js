@@ -78,8 +78,51 @@ const IPC = {
   queueEvent: "queue:event",
   masterEvent: "master:event",
   groqTranscribe: "groq:transcribe",
-  telegramTest: "telegram:test"
+  telegramTest: "telegram:test",
+  groqTestConnection: "groq:testConnection"
 };
+
+function encryptKey(plainText) {
+  if (!plainText) return "";
+  try {
+    if (electron.safeStorage && electron.safeStorage.isEncryptionAvailable()) {
+      const encryptedBuffer = electron.safeStorage.encryptString(plainText);
+      return "enc:" + encryptedBuffer.toString("base64");
+    }
+  } catch (e) {
+    console.error("Encryption failed:", e);
+  }
+  return "plain:" + Buffer.from(plainText).toString("base64");
+}
+
+function decryptKey(cipherText) {
+  if (!cipherText) return "";
+  try {
+    if (cipherText.startsWith("enc:")) {
+      if (electron.safeStorage && electron.safeStorage.isEncryptionAvailable()) {
+        const base64 = cipherText.slice(4);
+        const buffer = Buffer.from(base64, "base64");
+        return electron.safeStorage.decryptString(buffer);
+      } else {
+        throw new Error("Electron safeStorage is not available for decryption");
+      }
+    } else if (cipherText.startsWith("plain:")) {
+      return Buffer.from(cipherText.slice(6), "base64").toString("utf8");
+    }
+  } catch (e) {
+    // Treat as raw
+  }
+  return cipherText;
+}
+
+function maskApiKey(key) {
+  if (!key) return "";
+  if (key.length <= 8) return "****";
+  if (key.startsWith("gsk_")) {
+    return `gsk_****${key.slice(-4)}`;
+  }
+  return `${key.slice(0, 4)}****${key.slice(-4)}`;
+}
 const DEFAULTS = {
   theme: "dark",
   accent: "blue",
@@ -2711,7 +2754,7 @@ class RenderService {
             try {
               let lines = [];
               if (useGroq) {
-                const results = await groqService.transcribeMany([trackPath], lang, settings.groqApiKey);
+                const results = await groqService.transcribeMany([trackPath], lang, decryptKey(settings.groqApiKey));
                 lines = results[0]?.result?.lines ?? [];
               } else {
                 const result = await sidecarService.transcribe(trackPath, effectiveProject.lyrics.whisperModel ?? "small", lang);
@@ -3463,7 +3506,7 @@ class RenderService {
         if (fntDest) {
           fontsArg = `:fontsdir=${escapeSubtitlesPath(fntDest)}`;
         }
-        fc.push(`${lastVideo}subtitles=filename=${escapedSubPath}${fontsArg}${out}`);
+        fc.push(`${lastVideo}subtitles=${escapedSubPath}${fontsArg}${out}`);
         lastVideo = out;
       });
     }
@@ -4208,7 +4251,15 @@ class RenderService {
       proc.on("close", (code) => {
         this.current = null;
         if (code === 0) resolve();
-        else reject(new Error(`FFmpeg exited (${code}): ${stderr.split("\n").slice(-6).join(" ").trim()}`));
+        else {
+          const safeArgs = args.map(arg => arg.includes("gsk_") ? "gsk_****" : arg);
+          const cmdStr = `ffmpeg ${safeArgs.join(" ")}`;
+          console.error(`FFmpeg Error (Exit Code ${code})`);
+          console.error(`Command: ${cmdStr}`);
+          console.error(`Stderr: ${stderr}`);
+          const errLines = stderr.split("\n").slice(-8).join(" ").trim();
+          reject(new Error(`FFmpeg exited (${code}): ${errLines}\nCommand: ${cmdStr}`));
+        }
       });
     });
   }
@@ -4376,12 +4427,34 @@ function registerIpcHandlers(getWindow) {
   electron.ipcMain.handle(IPC.ffmpegInfo, () => ffmpegService.detect());
   electron.ipcMain.handle(IPC.sidecarPing, () => sidecarService.ping());
   electron.ipcMain.handle(IPC.sidecarStatus, () => sidecarService.status());
-  electron.ipcMain.handle(IPC.settingsGet, () => configService.getAll());
+  electron.ipcMain.handle(IPC.settingsGet, async () => {
+    const s = await configService.getAll();
+    return {
+      ...s,
+      groqApiKey: maskApiKey(decryptKey(s.groqApiKey))
+    };
+  });
   electron.ipcMain.handle(IPC.settingsSet, async (_e, patch) => {
-    const updated = await configService.set(patch);
+    let finalPatch = { ...patch };
+    if ("groqApiKey" in patch) {
+      const newKey = patch.groqApiKey;
+      const currentSettings = await configService.getAll();
+      if (newKey && newKey.includes("****")) {
+        // user didn't change it, keep existing key
+        delete finalPatch.groqApiKey;
+      } else if (!newKey) {
+        finalPatch.groqApiKey = "";
+      } else {
+        finalPatch.groqApiKey = encryptKey(newKey);
+      }
+    }
+    const updated = await configService.set(finalPatch);
     if ("ffmpegPath" in patch) await ffmpegService.detect(true);
     if ("ffmpegPath" in patch || "encoderPreference" in patch) await hardwareService.detect(true);
-    return updated;
+    return {
+      ...updated,
+      groqApiKey: maskApiKey(decryptKey(updated.groqApiKey))
+    };
   });
   electron.ipcMain.handle(IPC.telegramTest, () => telegramService.test());
   electron.ipcMain.handle(IPC.projectNew, (_e, name, mode) => projectService.newProject(name, mode));
@@ -4460,7 +4533,55 @@ function registerIpcHandlers(getWindow) {
     IPC.groqTranscribe,
     async (_e, paths, language) => {
       const settings = await configService.getAll();
-      return groqService.transcribeMany(paths, language, settings.groqApiKey);
+      return groqService.transcribeMany(paths, language, decryptKey(settings.groqApiKey));
+    }
+  );
+  electron.ipcMain.handle(
+    IPC.groqTestConnection,
+    async (_e, apiKey) => {
+      try {
+        let keyToTest = apiKey;
+        if (apiKey && apiKey.includes("****")) {
+          const settings = await configService.getAll();
+          keyToTest = decryptKey(settings.groqApiKey);
+        }
+        if (!keyToTest) {
+          throw new Error("API key belum diatur.");
+        }
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${keyToTest}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "llama-3.1-8b-instant",
+            messages: [
+              {
+                role: "user",
+                content: "Reply only: OK"
+              }
+            ],
+            temperature: 0,
+            max_tokens: 5
+          })
+        });
+        if (!response.ok) {
+          let errMsg = `HTTP error ${response.status}`;
+          try {
+            const data = await response.json();
+            if (data?.error?.message) {
+              errMsg = data.error.message;
+            }
+          } catch (e) {}
+          return { ok: false, error: errMsg };
+        }
+        const data = await response.json();
+        const content = data?.choices?.[0]?.message?.content?.trim();
+        return { ok: true, content };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
     }
   );
   electron.ipcMain.handle(IPC.audioAnalyze, (_e, path) => sidecarService.analyze(path));
