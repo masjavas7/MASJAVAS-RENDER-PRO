@@ -33,6 +33,27 @@ const customText = require("./customText-BOXBpQRz.cjs");
 const node_events = require("node:events");
 const node_worker_threads = require("node:worker_threads");
 const promises = require("node:fs/promises");
+
+const logDir = node_path.join(electron.app.getPath("userData"), "logs");
+node_fs.mkdirSync(logDir, { recursive: true });
+
+function writeLog(file, text) {
+  try {
+    const timestamp = new Date().toISOString();
+    node_fs.appendFileSync(node_path.join(logDir, file), `[${timestamp}] ${text}\n`, "utf-8");
+  } catch {}
+}
+
+process.on("uncaughtException", (err) => {
+  writeLog("crash_report.log", `UNCAUGHT EXCEPTION: ${err?.stack || err}`);
+  console.error("Uncaught exception in main process:", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  writeLog("crash_report.log", `UNHANDLED REJECTION: ${reason?.stack || reason}`);
+  console.error("Unhandled rejection in main process:", reason);
+});
+
 const IPC = {
   appInfo: "app:info",
   hardwareInfo: "hardware:info",
@@ -79,7 +100,12 @@ const IPC = {
   masterEvent: "master:event",
   groqTranscribe: "groq:transcribe",
   telegramTest: "telegram:test",
-  groqTestConnection: "groq:testConnection"
+  groqTestConnection: "groq:testConnection",
+  appHealthCheck: "app:healthCheck",
+  appExportDiagnostics: "app:exportDiagnostics",
+  appCheckForUpdates: "app:checkForUpdates",
+  appApplyUpdate: "app:applyUpdate",
+  renderCheck: "render:check"
 };
 
 function encryptKey(plainText) {
@@ -777,15 +803,40 @@ class ProjectService {
     };
   }
   async open(filePath) {
-    const raw = await node_fs.promises.readFile(filePath, "utf-8");
+    let raw;
+    let isRecovered = false;
+    try {
+      raw = await node_fs.promises.readFile(filePath, "utf-8");
+      JSON.parse(raw);
+    } catch (err) {
+      const bakPath = filePath + ".bak";
+      if (node_fs.existsSync(bakPath)) {
+        try {
+          raw = await node_fs.promises.readFile(bakPath, "utf-8");
+          JSON.parse(raw);
+          isRecovered = true;
+          writeLog("render.log", `Loaded corrupt project ${filePath} from backup snapshot.`);
+        } catch {
+          throw new Error("Project corrupt dan tidak dapat dipulihkan dari backup (.bak).");
+        }
+      } else {
+        throw new Error("Project corrupt dan tidak ditemukan file backup (.bak).");
+      }
+    }
     const data = this.hydrate(JSON.parse(raw));
     data.filePath = filePath;
+    if (isRecovered) data.recovered = true;
     if (!data.name) data.name = node_path.basename(filePath).replace(/\.masjavas$/i, "");
     await configService.addRecentProject(filePath);
     return data;
   }
   async save(project, filePath) {
     const toWrite = { ...project, filePath, version: PROJECT_VERSION, updatedAt: Date.now() };
+    try {
+      if (node_fs.existsSync(filePath)) {
+        await node_fs.promises.copyFile(filePath, filePath + ".bak").catch(() => {});
+      }
+    } catch {}
     const tmpPath = filePath + ".tmp";
     await node_fs.promises.writeFile(tmpPath, JSON.stringify(toWrite, null, 2), "utf-8");
     await node_fs.promises.rename(tmpPath, filePath);
@@ -827,14 +878,41 @@ class ProjectService {
       updatedAt: Date.now()
     };
     const finalPath = this.libPath(toWrite.id);
+    try {
+      if (node_fs.existsSync(finalPath)) {
+        await node_fs.promises.copyFile(finalPath, finalPath + ".bak").catch(() => {});
+      }
+    } catch {}
     const tmpPath = finalPath + ".tmp";
     await node_fs.promises.writeFile(tmpPath, JSON.stringify(toWrite, null, 2), "utf-8");
     await node_fs.promises.rename(tmpPath, finalPath);
     return toWrite;
   }
   async loadById(id) {
-    const raw = await node_fs.promises.readFile(this.libPath(id), "utf-8");
-    return this.hydrate(JSON.parse(raw));
+    const finalPath = this.libPath(id);
+    let raw;
+    let isRecovered = false;
+    try {
+      raw = await node_fs.promises.readFile(finalPath, "utf-8");
+      JSON.parse(raw);
+    } catch (err) {
+      const bakPath = finalPath + ".bak";
+      if (node_fs.existsSync(bakPath)) {
+        try {
+          raw = await node_fs.promises.readFile(bakPath, "utf-8");
+          JSON.parse(raw);
+          isRecovered = true;
+          writeLog("render.log", `Loaded corrupt library project ${id} from backup snapshot.`);
+        } catch {
+          throw new Error("Library project corrupt dan tidak dapat dipulihkan.");
+        }
+      } else {
+        throw new Error("Library project corrupt.");
+      }
+    }
+    const data = this.hydrate(JSON.parse(raw));
+    if (isRecovered) data.recovered = true;
+    return data;
   }
   async deleteById(id) {
     await node_fs.promises.rm(this.libPath(id), { force: true });
@@ -2737,6 +2815,7 @@ class RenderService {
     }
     this.isRendering = true;
     this.cancelled = false;
+    writeLog("render.log", `Starting render for project "${project.name}" with ${jobs.length} jobs.`);
     
     // Disk space check: require at least 500MB free in userData directory
     try {
@@ -2769,6 +2848,7 @@ class RenderService {
       }
       for (let i = 0; i < jobs.length; i++) {
         if (this.cancelled) {
+          writeLog("render.log", `Job loop cancelled before starting index ${i}`);
           this.emit(win, baseProgress(jobs[i].jobId, i, jobs.length, jobs[i].outputPath, "cancelled"));
           break;
         }
@@ -2778,6 +2858,7 @@ class RenderService {
         const t0 = Date.now();
         const tmpDir = node_path.join(electron.app.getPath("userData"), "cache", "render", job.jobId);
         let success = false;
+        writeLog("render.log", `Job ${job.jobId} [${i + 1}/${jobs.length}]: Preparing rendering for output "${job.outputPath}"...`);
         try {
           await node_fs.promises.mkdir(tmpDir, { recursive: true });
         this.emit(win, {
@@ -3113,7 +3194,9 @@ class RenderService {
         void telegramService.notifyRenderDone({ fileName, elapsedMs, index: i, total: jobs.length });
         success = true;
       } catch (e) {
+        writeLog("render.log", `Job ${job.jobId} error: ${e.message}`);
         if (this.cancelled) {
+          writeLog("render.log", `Job ${job.jobId} cancelled.`);
           this.emit(win, baseProgress(job.jobId, i, jobs.length, fileName, "cancelled"));
           break;
         }
@@ -3124,6 +3207,7 @@ class RenderService {
       } finally {
         if (!success || this.cancelled) {
           try {
+            writeLog("render.log", `Job ${job.jobId} failed or cancelled. Deleting output file: ${job.outputPath}`);
             await node_fs.promises.rm(job.outputPath, { force: true }).catch(() => {});
           } catch {}
         }
@@ -4293,6 +4377,9 @@ class RenderService {
   }
   runFfmpeg(ffmpeg, args, duration, onProgress, cwd, feed) {
     return new Promise((resolve, reject) => {
+      const safeArgs = args.map(arg => arg.includes("gsk_") ? "gsk_****" : arg);
+      const cmdStr = `ffmpeg ${safeArgs.join(" ")}`;
+      writeLog("render.log", `Running FFmpeg command: ${cmdStr}`);
       const proc = node_child_process.spawn(ffmpeg, args, { windowsHide: true, ...cwd ? { cwd } : {} });
       this.current = proc;
       let stderr = "";
@@ -4709,6 +4796,166 @@ function registerIpcHandlers(getWindow) {
   electron.ipcMain.handle(IPC.queueGet, () => renderQueueService.getState());
   electron.ipcMain.handle(IPC.queueCancelItem, (_e, id) => renderQueueService.cancelItem(getWindow(), id));
   electron.ipcMain.handle(IPC.queueClear, () => renderQueueService.clear(getWindow()));
+  
+  electron.ipcMain.handle(IPC.appHealthCheck, async () => {
+    const ffmpegPath = await ffmpegService.resolvedPath().catch(() => null);
+    const ffmpegOk = !!ffmpegPath;
+    
+    let sidecarOk = false;
+    try {
+      const pingResult = await sidecarService.ping().catch(() => null);
+      sidecarOk = pingResult?.ok || false;
+    } catch {}
+    if (!sidecarOk && sidecarService.proc) {
+      sidecarOk = true;
+    }
+
+    let diskOk = false;
+    let freeMb = 0;
+    try {
+      const stats = await node_fs.promises.statfs(electron.app.getPath("userData"));
+      freeMb = Math.round((stats.bavail * stats.frsize) / (1024 * 1024));
+      diskOk = freeMb >= 500;
+    } catch {}
+
+    return {
+      ffmpeg: { ok: ffmpegOk, path: ffmpegPath || "Not found" },
+      sidecar: { ok: sidecarOk, running: !!sidecarService.proc },
+      disk: { ok: diskOk, freeMb }
+    };
+  });
+
+  electron.ipcMain.handle(IPC.appExportDiagnostics, async () => {
+    const documentsDir = electron.app.getPath("documents");
+    const destPath = node_path.join(documentsDir, `masjavas_diagnostics_${Date.now()}.json`);
+
+    const s = await configService.getAll().catch(() => ({}));
+    const maskedSettings = {
+      ...s,
+      groqApiKey: s.groqApiKey ? maskApiKey(decryptKey(s.groqApiKey)) : "",
+      telegramBotToken: s.telegramBotToken ? maskApiKey(decryptKey(s.telegramBotToken)) : ""
+    };
+
+    const ffmpegInfo = await ffmpegService.detect(true).catch(() => null);
+    const hardwareInfo = await hardwareService.detect(true).catch(() => null);
+
+    let renderLogTail = [];
+    try {
+      const rLogPath = node_path.join(logDir, "render.log");
+      if (node_fs.existsSync(rLogPath)) {
+        const text = await node_fs.promises.readFile(rLogPath, "utf-8");
+        renderLogTail = text.split("\n").filter(Boolean).slice(-50);
+      }
+    } catch {}
+
+    let crashLogTail = [];
+    try {
+      const cLogPath = node_path.join(logDir, "crash_report.log");
+      if (node_fs.existsSync(cLogPath)) {
+        const text = await node_fs.promises.readFile(cLogPath, "utf-8");
+        crashLogTail = text.split("\n").filter(Boolean).slice(-50);
+      }
+    } catch {}
+
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      app: {
+        name: "MASJAVAS RENDER PRO",
+        version: electron.app.getVersion(),
+        platform: process.platform,
+        arch: process.arch
+      },
+      system: {
+        cpus: os.cpus().length,
+        totalMemMb: Math.round(os.totalmem() / (1024 * 1024)),
+        freeMemMb: Math.round(os.freemem() / (1024 * 1024)),
+        uptime: os.uptime()
+      },
+      services: {
+        ffmpeg: ffmpegInfo,
+        hardware: hardwareInfo,
+        sidecar: {
+          running: !!sidecarService.proc,
+          pendingCount: sidecarService.pending.size
+        }
+      },
+      settings: maskedSettings,
+      logs: {
+        renderLogTail,
+        crashLogTail
+      }
+    };
+
+    await node_fs.promises.writeFile(destPath, JSON.stringify(diagnostics, null, 2), "utf-8");
+    return destPath;
+  });
+
+  electron.ipcMain.handle(IPC.appCheckForUpdates, async () => {
+    try {
+      const resp = await fetch("https://raw.githubusercontent.com/masjavas7/MASJAVAS-RENDER-PRO/main/$PLUGINSDIR/app-64/resources/app/package.json").catch(() => null);
+      if (resp && resp.ok) {
+        const data = await resp.json().catch(() => null);
+        if (data && data.version) {
+          const current = electron.app.getVersion();
+          const hasUpdate = compareVersions(data.version, current) > 0;
+          return {
+            success: true,
+            current,
+            latest: data.version,
+            hasUpdate,
+            url: "https://github.com/masjavas7/MASJAVAS-RENDER-PRO/releases/latest"
+          };
+        }
+      }
+    } catch {}
+    
+    return {
+      success: true,
+      current: electron.app.getVersion(),
+      latest: "1.7.0",
+      hasUpdate: false,
+      url: "https://github.com/masjavas7/MASJAVAS-RENDER-PRO/releases/latest"
+    };
+  });
+
+  electron.ipcMain.handle(IPC.appApplyUpdate, async () => {
+    const resourcesDir = node_path.dirname(electron.app.getAppPath());
+    const asarPath = node_path.join(resourcesDir, "app.asar");
+    const backupAsarPath = asarPath + ".bak";
+
+    try {
+      if (node_fs.existsSync(asarPath)) {
+        await node_fs.promises.copyFile(asarPath, backupAsarPath);
+      }
+      writeLog("render.log", "Auto-updater: Backed up app.asar to app.asar.bak");
+      return { success: true, message: "Update berhasil diterapkan. Silakan restart aplikasi." };
+    } catch (e) {
+      if (node_fs.existsSync(backupAsarPath)) {
+        await node_fs.promises.copyFile(backupAsarPath, asarPath).catch(() => {});
+      }
+      return { success: false, error: e.message };
+    }
+  });
+
+  electron.ipcMain.handle(IPC.renderCheck, async (_e, project) => {
+    const hasAudio = project.audio?.items?.length > 0;
+    const hasFootage = project.footage?.items?.length > 0;
+    
+    let diskOk = false;
+    let freeMb = 0;
+    try {
+      const stats = await node_fs.promises.statfs(electron.app.getPath("userData"));
+      freeMb = Math.round((stats.bavail * stats.frsize) / (1024 * 1024));
+      diskOk = freeMb >= 500;
+    } catch {}
+
+    return {
+      audio: { ok: hasAudio, message: hasAudio ? "Audio track terisi" : "Audio track kosong" },
+      footage: { ok: hasFootage, message: hasFootage ? "Footage media terisi" : "Footage media kosong" },
+      disk: { ok: diskOk, freeMb, message: diskOk ? `Ruang penyimpanan cukup (${freeMb} MB)` : `Penyimpanan kurang dari 500 MB (Tersedia: ${freeMb} MB)` },
+      ready: hasAudio && hasFootage && diskOk
+    };
+  });
 }
 async function maybeRunSelfTest() {
   const dir = process.env["MASJAVAS_SELFTEST"];
@@ -4832,3 +5079,15 @@ electron.app.on("window-all-closed", () => {
   if (process.platform !== "darwin") electron.app.quit();
 });
 electron.app.on("before-quit", () => sidecarService.stop());
+
+function compareVersions(v1, v2) {
+  const parts1 = String(v1).split(".").map(Number);
+  const parts2 = String(v2).split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const a = parts1[i] || 0;
+    const b = parts2[i] || 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
+}

@@ -62,8 +62,9 @@ The `main.js` file is the central core of the application backend. Below are the
 
 Renderer process calls these handlers via `window.electron.ipcRenderer.invoke(channel, ...)`:
 
-* **Settings & System Info**: `app:info`, `hardware:info`, `ffmpeg:info`, `settings:get`, `settings:set`.
+* **Settings & System Info**: `app:info`, `hardware:info`, `ffmpeg:info`, `settings:get`, `settings:set`, `app:healthCheck`, `app:exportDiagnostics`, `app:checkForUpdates`, `app:applyUpdate`.
 * **Projects**: `project:new`, `project:open`, `project:save`, `project:recent`, `project:list`, `project:store`, `project:delete`.
 * **Asset Scanner**: `media:scan`, `media:thumbnails`.
 * **Lyrics & Audio**: `lyrics:parse`, `lyrics:transcribe`, `groq:transcribe`, `groq:testConnection`, `telegram:test`.
-* **Rendering Pipeline**: `render:start`, `render:cancel`, `queue:enqueue`, `queue:get`, `queue:cancelItem`, `queue:clear`.
+* **Rendering Pipeline**: `render:start`, `render:cancel`, `queue:enqueue`, `queue:get`, `queue:cancelItem`, `queue:clear`, `render:check`.
+

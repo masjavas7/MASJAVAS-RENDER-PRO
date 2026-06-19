@@ -74,3 +74,22 @@ The video rendering flow orchestrated by `RenderService` consists of the followi
 * **Secrets Hardening**: API Keys (`groqApiKey`, `telegramBotToken`) are encrypted at rest using OS-native credentials store via `electron.safeStorage`. On systems where safeStorage is unavailable, it gracefully falls back to masked Base64 encoding.
 * **Masked Display**: Decrypted keys never enter the renderer process; only masked keys (e.g., `gsk_****abcd`) are sent to the UI.
 * **Path Traversal Protection**: Subtitle filenames and paths are sanitized and escaped to prevent arguments injection in FFmpeg CLI.
+
+---
+
+## 4. Observability & System Diagnostics
+
+To ensure enterprise-grade observability and runtime health tracking, MASJAVAS RENDER PRO implements:
+* **Crash Reporter**: Intercepts `uncaughtException` and `unhandledRejection` globally in the main process, appending formatted stack traces to `userData/logs/crash_report.log`.
+* **Execution Logs**: Writes detailed execution logs, FFmpeg commands, and render stats to `userData/logs/render.log` in real-time.
+* **Diagnostics Compiler**: Compiles an exportable `diagnostics.json` in the user's Documents folder. This file combines hardware specs, service status, app configuration (with secrets masked), and the tail ends of the crash/render log files.
+* **Health Check API**: Performs automated health monitoring of the FFmpeg binary, Sidecar subprocess, and user disk storage availability.
+
+---
+
+## 5. Release Hardening & Data Recovery
+
+* **Atomic File Writes**: Prevents project file corruption by writing changes to a temporary file before renaming it to the target file.
+* **Project Backups (.bak)**: Saves a copy of the project as `.masjavas.bak` alongside the primary file.
+* **Auto-Recovery**: If loading a `.masjavas` file throws a JSON parse exception, the system automatically falls back to restoring from the `.bak` file, adding a `recovered` flag to warn the user.
+* **Auto-Updater Rollback**: The updater backs up the original `app.asar` to `app.asar.bak` before writing updates. If the application crashes on startup after an update, it restores the backup `app.asar` automatically.

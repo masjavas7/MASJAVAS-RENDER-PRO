@@ -46,7 +46,12 @@ const IPC = {
   masterEvent: "master:event",
   groqTranscribe: "groq:transcribe",
   telegramTest: "telegram:test",
-  groqTestConnection: "groq:testConnection"
+  groqTestConnection: "groq:testConnection",
+  appHealthCheck: "app:healthCheck",
+  appExportDiagnostics: "app:exportDiagnostics",
+  appCheckForUpdates: "app:checkForUpdates",
+  appApplyUpdate: "app:applyUpdate",
+  renderCheck: "render:check"
 };
 const api = {
   getAppInfo: () => electron.ipcRenderer.invoke(IPC.appInfo),
@@ -107,6 +112,11 @@ const api = {
   },
   // Telegram notifications — test the saved bot token + chat id.
   telegramTest: () => electron.ipcRenderer.invoke(IPC.telegramTest),
-  groqTestConnection: (apiKey) => electron.ipcRenderer.invoke(IPC.groqTestConnection, apiKey)
+  groqTestConnection: (apiKey) => electron.ipcRenderer.invoke(IPC.groqTestConnection, apiKey),
+  appHealthCheck: () => electron.ipcRenderer.invoke(IPC.appHealthCheck),
+  appExportDiagnostics: () => electron.ipcRenderer.invoke(IPC.appExportDiagnostics),
+  appCheckForUpdates: () => electron.ipcRenderer.invoke(IPC.appCheckForUpdates),
+  appApplyUpdate: () => electron.ipcRenderer.invoke(IPC.appApplyUpdate),
+  renderCheck: (project) => electron.ipcRenderer.invoke(IPC.renderCheck, project)
 };
 electron.contextBridge.exposeInMainWorld("masjavas", api);

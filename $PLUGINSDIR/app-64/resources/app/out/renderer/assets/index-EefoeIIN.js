@@ -7476,6 +7476,15 @@ function HomeScreen() {
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "home-tagline", children: "Video Editor & Visualizer Pro. Mudah digunakan untuk pemula, bertenaga untuk profesional." })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "home-body", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", style: { margin: "0 20px 20px 20px", padding: 16, border: "1px solid var(--border)", background: "var(--bg-elev)", borderRadius: "var(--radius)" }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { style: { marginTop: 0, display: "flex", alignItems: "center", gap: 6 }, children: "🚀 Panduan Memulai Cepat (Onboarding)" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("ol", { style: { paddingLeft: 16, margin: "10px 0 0 0", fontSize: 13, lineHeight: "1.6", color: "var(--text-dim)" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("li", { children: "Pilih salah satu template pembuatan video di bawah (misal, Video Musik atau Karaoke)." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("li", { children: "Impor file musik/audio di tab Audio, lalu impor video atau gambar latar belakang di tab Media." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("li", { children: "Jika menggunakan mode Karaoke/Lirik, masukkan teks lirik lagu di tab Lirik (bisa transkripsi otomatis)." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("li", { children: "Buka tab Render untuk memilih resolusi, cek prasyarat, lalu klik 'Tambah ke Antrian Render'!" })
+        ] })
+      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("section", { className: "home-create", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "home-actions", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "action-card primary", onClick: () => createProject("Proyek Video Musik", "studio"), children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ac-ico", children: "🎵" }),
@@ -13609,6 +13618,22 @@ function RenderPanel() {
   const queue = useApp((s) => s.renderQueue);
   const [copied, setCopied] = reactExports.useState(false);
   const [masterPresets, setMasterPresets] = reactExports.useState([]);
+  const [checklist, setChecklist] = reactExports.useState(null);
+  const runChecklist = reactExports.useCallback(async () => {
+    if (project) {
+      try {
+        const res = await window.masjavas.renderCheck(project);
+        setChecklist(res);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [project]);
+  reactExports.useEffect(() => {
+    runChecklist();
+    const interval = setInterval(runChecklist, 5000);
+    return () => clearInterval(interval);
+  }, [runChecklist]);
   reactExports.useEffect(() => {
     window.masjavas.masterPresets().then(setMasterPresets);
   }, []);
@@ -13794,6 +13819,23 @@ function RenderPanel() {
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "soon", style: { marginTop: 8 }, children: exp.batchRender ? `Akan merender ${Math.max(1, Math.floor(exp.batchCount ?? 1))} video. Footage & lagu diacak ulang tiap video; semua elemen overlay sama. File: ${(project.name || "mix").replace(/[\\/:*?"<>|]/g, "_")}_01.mp4, _02.mp4, …` : "Nonaktif — merender 1 video." })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Prasyarat Render" }),
+      checklist ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Audio terimpor" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(StatusPill, { ok: checklist.audio.ok, label: checklist.audio.ok ? "Siap" : "Kosong" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Footage terimpor" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(StatusPill, { ok: checklist.footage.ok, label: checklist.footage.ok ? "Siap" : "Kosong" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Penyimpanan disk" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(StatusPill, { ok: checklist.disk.ok, label: checklist.disk.ok ? "Cukup" : `Kurang (${checklist.disk.freeMb}MB)` })
+        ] })
+      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 12, color: "var(--text-dim)" }, children: "Memeriksa prasyarat..." })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Output" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "btn-row", style: { marginBottom: 10 }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: async () => {
         const f2 = await window.masjavas.openFolder();
@@ -13807,7 +13849,8 @@ function RenderPanel() {
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Output" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "val", children: exp.batchRender ? `${Math.max(1, Math.floor(exp.batchCount ?? 1))} video (batch)` : "1 video" })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "btn-row", style: { marginTop: 14 }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn primary", onClick: start, children: "+ Tambah ke Antrian Render" }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "btn-row", style: { marginTop: 14 }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: `btn primary ${(!checklist || !checklist.ready) ? "disabled" : ""}`, disabled: !checklist || !checklist.ready, onClick: start, children: "+ Tambah ke Antrian Render" }) }),
+      (!checklist || !checklist.ready) && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--bad, #f66)", marginTop: 6, textAlign: "center" }, children: "⚠ Silakan penuhi prasyarat render di atas untuk memulai." }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "soon", style: { fontSize: 11, marginTop: 6 }, children: "Semua mode masuk antrian. Setelah ditambahkan, buka/buat project lain & tambahkan lagi — antrian diproses berurutan. (Lirik/Playlist full reaktif, Batch dummy.)" })
     ] }),
     queue.items.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
@@ -13888,6 +13931,20 @@ function RenderPanel() {
           ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(Bar, { pct: totalPct, color: "var(--accent)" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 6, margin: "10px 0", padding: "8px 10px", background: "var(--bg-elev2)", borderRadius: 6, fontSize: 12 }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: ["♪ ", "Persiapan audio & penggabungan"] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { color: (progress.status === "rendering" || progress.status === "done") ? "var(--good)" : "var(--warn)" }, children: (progress.status === "rendering" || progress.status === "done") ? "Selesai" : "Memproses..." })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: ["“” ", "Transkripsi lirik & subtitle"] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { color: (progress.status === "rendering" || progress.status === "done") ? "var(--good)" : progress.task?.includes("lirik") ? "var(--warn)" : "var(--text-faint)" }, children: (progress.status === "rendering" || progress.status === "done") ? "Selesai" : progress.task?.includes("lirik") ? "Memproses..." : "Menunggu" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: ["⚡ ", "Rendering video (FFmpeg)"] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { color: progress.status === "done" ? "var(--good)" : progress.status === "rendering" ? "var(--warn)" : "var(--text-faint)" }, children: progress.status === "done" ? "Selesai" : progress.status === "rendering" ? `Rendering (${totalPct}%)` : "Menunggu" })
+          ] })
+        ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 10, marginBottom: 3, color: "var(--text-dim)" }, children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Proses saat ini" }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
@@ -13972,6 +14029,25 @@ function SettingsPanel() {
   const [tgSaved, setTgSaved] = reactExports.useState(false);
   const [showTgToken, setShowTgToken] = reactExports.useState(false);
   const [tgTesting, setTgTesting] = reactExports.useState(false);
+  const [healthData, setHealthData] = reactExports.useState(null);
+  const [checkingHealth, setCheckingHealth] = reactExports.useState(false);
+  const [updateStatus, setUpdateStatus] = reactExports.useState(null);
+  const [checkingUpdate, setCheckingUpdate] = reactExports.useState(false);
+  const [exportingDiagnostics, setExportingDiagnostics] = reactExports.useState(false);
+  const checkHealth = async () => {
+    setCheckingHealth(true);
+    try {
+      const res = await window.masjavas.appHealthCheck();
+      setHealthData(res);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCheckingHealth(false);
+    }
+  };
+  reactExports.useEffect(() => {
+    checkHealth();
+  }, []);
   if (!settings) return /* @__PURE__ */ jsxRuntimeExports.jsx("div", {});
   const qualityLabel = (q2) => q2 === "low" ? "Rendah" : q2 === "balanced" ? "Seimbang" : "Tinggi";
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
@@ -14006,6 +14082,7 @@ function SettingsPanel() {
           /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Encoder Render" }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Preferensi encoder (otomatis pilih GPU terbaik yang tersedia)" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--text-dim)", margin: "4px 0" }, children: "💡 GPU Encoder (NVENC, AMF, QSV) mempercepat render hingga 5x lipat daripada CPU standar." }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "select",
               {
@@ -14028,6 +14105,7 @@ function SettingsPanel() {
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", style: { marginTop: 12 }, children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Mode kualitas (bitrate otomatis)" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--text-dim)", margin: "4px 0" }, children: "💡 Kualitas mengatur bitrate secara otomatis: Rendah (2-5 Mbps), Seimbang (8-12 Mbps), Tinggi (15-20 Mbps)." }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: ["low", "balanced", "high"].map((q2) => /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: settings.qualityMode === q2 ? "on" : "", onClick: () => update({ qualityMode: q2 }), children: qualityLabel(q2) }, q2)) })
           ] })
         ] }),
@@ -14042,6 +14120,7 @@ function SettingsPanel() {
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "field", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Provider transkripsi lirik" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--text-dim)", margin: "4px 0" }, children: "💡 WhisperX dijalankan secara lokal di PC Anda. Groq AI berjalan di cloud (sangat cepat dan akurat, memerlukan API key)." }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "seg", children: ["whisper", "groq"].map((p2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
@@ -14301,8 +14380,17 @@ function SettingsPanel() {
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "val" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `pill ${sidecar?.running ? "ok" : sidecar?.pythonFound ? "warn" : "no"}`, children: sidecar?.running ? "Aktif" : sidecar?.pythonFound ? "Standby" : "Belum siap" })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", style: { marginTop: 14 }, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: () => refresh().then(() => toast("info", "Status diperbarui.")), children: "Perbarui Status" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-row", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Penyimpanan disk" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "val" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(StatusPill, { ok: healthData?.disk?.ok ?? true, label: healthData?.disk ? `${healthData.disk.freeMb} MB Bebas` : "Memeriksa..." })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-row", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Auto Update" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "val", children: updateStatus ? (updateStatus.hasUpdate ? `Versi baru v${updateStatus.latest} tersedia` : "Aplikasi versi terbaru") : "Belum diperiksa" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "btn-row", style: { marginTop: 14, flexWrap: "wrap", gap: 8 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", onClick: () => refresh().then(() => checkHealth()).then(() => toast("info", "Status diperbarui.")), children: "Perbarui Status" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(
           "button",
           {
@@ -14311,8 +14399,72 @@ function SettingsPanel() {
               const res = await window.masjavas.pingSidecar();
               toast(res.running ? "success" : "error", res.running ? "Pemrosesan audio aktif." : "Pemrosesan audio belum siap.");
               refresh();
+              checkHealth();
             },
             children: "Uji Pemrosesan Audio"
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            className: "btn",
+            disabled: exportingDiagnostics,
+            onClick: async () => {
+              setExportingDiagnostics(true);
+              try {
+                const path = await window.masjavas.appExportDiagnostics();
+                toast("success", `Diagnostik diekspor ke: ${path}`);
+              } catch (e) {
+                toast("error", `Gagal ekspor: ${e.message}`);
+              } finally {
+                setExportingDiagnostics(false);
+              }
+            },
+            children: exportingDiagnostics ? "Mengekspor…" : "Ekspor Diagnostik"
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            className: "btn",
+            disabled: checkingUpdate,
+            onClick: async () => {
+              setCheckingUpdate(true);
+              try {
+                const res = await window.masjavas.appCheckForUpdates();
+                setUpdateStatus(res);
+                if (res.hasUpdate) {
+                  toast("info", `Update tersedia: v${res.latest}. Silakan klik 'Terapkan Update'`);
+                } else {
+                  toast("success", "Aplikasi Anda sudah versi terbaru.");
+                }
+              } catch (e) {
+                toast("error", `Gagal cek update: ${e.message}`);
+              } finally {
+                setCheckingUpdate(false);
+              }
+            },
+            children: checkingUpdate ? "Memeriksa…" : "Cek Update"
+          }
+        ),
+        updateStatus?.hasUpdate && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            className: "btn primary",
+            onClick: async () => {
+              toast("info", "Sedang menerapkan update...");
+              try {
+                const res = await window.masjavas.appApplyUpdate();
+                if (res.success) {
+                  toast("success", res.message);
+                } else {
+                  toast("error", `Gagal update: ${res.error}`);
+                }
+              } catch (e) {
+                toast("error", `Gagal update: ${e.message}`);
+              }
+            },
+            children: "Terapkan Update"
           }
         )
       ] }),
