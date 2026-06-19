@@ -177,7 +177,9 @@ class ConfigService {
   }
   async flush() {
     await this.ensure();
-    await node_fs.promises.writeFile(this.file, JSON.stringify(this.cache, null, 2), "utf-8");
+    const tmpPath = this.file + ".tmp";
+    await node_fs.promises.writeFile(tmpPath, JSON.stringify(this.cache, null, 2), "utf-8");
+    await node_fs.promises.rename(tmpPath, this.file);
   }
 }
 const configService = new ConfigService();
@@ -373,6 +375,7 @@ class SidecarService {
   nextId = 1;
   buffer = "";
   pythonCmd = null;
+  startPromise = null;
   async resolvePython() {
     if (this.pythonCmd) return this.pythonCmd;
     const bundled = [
@@ -400,32 +403,38 @@ class SidecarService {
   }
   async start() {
     if (this.proc) return { running: true, pythonFound: true, message: "Sidecar running" };
-    const py = await this.resolvePython();
-    if (!py) {
-      return {
-        running: false,
-        pythonFound: false,
-        message: "Python sidecar not found. Audio analysis & mastering will be limited until Python (or the bundled sidecar) is available."
-      };
-    }
-    try {
-      this.proc = node_child_process.spawn(py.cmd, py.args, {
-        windowsHide: true,
-        env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" }
-      });
-      this.proc.stdout.setEncoding("utf-8");
-      this.proc.stdout.on("data", (chunk) => this.onData(chunk));
-      this.proc.stderr.setEncoding("utf-8");
-      this.proc.on("exit", () => {
+    if (this.startPromise) return this.startPromise;
+    this.startPromise = (async () => {
+      const py = await this.resolvePython();
+      if (!py) {
+        return {
+          running: false,
+          pythonFound: false,
+          message: "Python sidecar not found. Audio analysis & mastering will be limited until Python (or the bundled sidecar) is available."
+        };
+      }
+      try {
+        this.proc = node_child_process.spawn(py.cmd, py.args, {
+          windowsHide: true,
+          env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" }
+        });
+        this.proc.stdout.setEncoding("utf-8");
+        this.proc.stdout.on("data", (chunk) => this.onData(chunk));
+        this.proc.stderr.setEncoding("utf-8");
+        this.proc.on("exit", () => {
+          this.proc = null;
+          for (const [, p] of this.pending) p.reject(new Error("Sidecar exited"));
+          this.pending.clear();
+        });
+        return { running: true, pythonFound: true, message: `Sidecar started (${py.bundled ? "bundled" : py.cmd})` };
+      } catch (e) {
         this.proc = null;
-        for (const [, p] of this.pending) p.reject(new Error("Sidecar exited"));
-        this.pending.clear();
-      });
-      return { running: true, pythonFound: true, message: `Sidecar started (${py.bundled ? "bundled" : py.cmd})` };
-    } catch (e) {
-      this.proc = null;
-      return { running: false, pythonFound: true, message: `Failed to start sidecar: ${e.message}` };
-    }
+        return { running: false, pythonFound: true, message: `Failed to start sidecar: ${e.message}` };
+      }
+    })();
+    return this.startPromise.finally(() => {
+      this.startPromise = null;
+    });
   }
   onData(chunk) {
     this.buffer += chunk;
@@ -777,7 +786,9 @@ class ProjectService {
   }
   async save(project, filePath) {
     const toWrite = { ...project, filePath, version: PROJECT_VERSION, updatedAt: Date.now() };
-    await node_fs.promises.writeFile(filePath, JSON.stringify(toWrite, null, 2), "utf-8");
+    const tmpPath = filePath + ".tmp";
+    await node_fs.promises.writeFile(tmpPath, JSON.stringify(toWrite, null, 2), "utf-8");
+    await node_fs.promises.rename(tmpPath, filePath);
     await configService.addRecentProject(filePath);
     await this.store(toWrite).catch(() => {
     });
@@ -815,7 +826,10 @@ class ProjectService {
       createdAt: project.createdAt || Date.now(),
       updatedAt: Date.now()
     };
-    await node_fs.promises.writeFile(this.libPath(toWrite.id), JSON.stringify(toWrite, null, 2), "utf-8");
+    const finalPath = this.libPath(toWrite.id);
+    const tmpPath = finalPath + ".tmp";
+    await node_fs.promises.writeFile(tmpPath, JSON.stringify(toWrite, null, 2), "utf-8");
+    await node_fs.promises.rename(tmpPath, finalPath);
     return toWrite;
   }
   async loadById(id) {
@@ -944,7 +958,12 @@ async function cacheDir() {
 class ProbeService {
   probeCache = /* @__PURE__ */ new Map();
   async probe(path) {
-    if (this.probeCache.has(path)) return this.probeCache.get(path);
+    if (this.probeCache.has(path)) {
+      const cached = this.probeCache.get(path);
+      this.probeCache.delete(path);
+      this.probeCache.set(path, cached);
+      return cached;
+    }
     const ffprobe = await ffmpegService.ffprobePath();
     if (!ffprobe) throw new Error("ffprobe not found");
     const args = [
@@ -968,6 +987,10 @@ class ProbeService {
       hasAudio: !!a
     };
     this.probeCache.set(path, result);
+    if (this.probeCache.size > 200) {
+      const oldestKey = this.probeCache.keys().next().value;
+      this.probeCache.delete(oldestKey);
+    }
     return result;
   }
   /** Returns a data URL (jpeg) thumbnail for an image or video. */
@@ -1069,7 +1092,7 @@ const MAX_BYTES = 25 * 1024 * 1024;
 class GroqService {
   async transcribe(path, language, apiKey) {
     if (!apiKey) throw new Error("Groq API key belum diatur. Masukkan API key di Pengaturan → Groq AI.");
-    const stat = node_fs.statSync(path);
+    const stat = await node_fs.promises.stat(path);
     if (stat.size > MAX_BYTES) {
       throw new Error(
         `File audio terlalu besar untuk Groq (${(stat.size / 1024 / 1024).toFixed(1)} MB > 25 MB). Gunakan WhisperX lokal atau kompres audio terlebih dahulu.`
@@ -1107,15 +1130,28 @@ class GroqService {
   }
   /** Transcribe multiple audio paths in parallel. Returns settled results. */
   async transcribeMany(paths, language, apiKey) {
-    const tasks = paths.map(async (p) => {
-      try {
-        const result = await this.transcribe(p, language, apiKey);
-        return { path: p, result };
-      } catch (e) {
-        return { path: p, error: e.message };
+    const limit = 3;
+    const results = [];
+    const executing = [];
+    for (const p of paths) {
+      const task = (async () => {
+        try {
+          const result = await this.transcribe(p, language, apiKey);
+          return { path: p, result };
+        } catch (e) {
+          return { path: p, error: e.message };
+        }
+      })();
+      results.push(task);
+      if (limit < paths.length) {
+        const e = task.then(() => executing.splice(executing.indexOf(e), 1));
+        executing.push(e);
+        if (executing.length >= limit) {
+          await Promise.race(executing);
+        }
       }
-    });
-    return Promise.all(tasks);
+    }
+    return Promise.all(results);
   }
 }
 async function fileToBlob(path) {
@@ -1190,13 +1226,15 @@ const telegramService = {
   /** Send a test message using the CURRENT saved settings. Used by the Settings "Test" button. */
   async test() {
     const s = await configService.getAll();
-    if (!s.telegramBotToken || !s.telegramChatId) return { ok: false, error: "Bot token / Chat ID belum diisi" };
-    return post(s.telegramBotToken, s.telegramChatId, "✅ <b>Masjavas terhubung.</b>\nNotifikasi render aktif.");
+    const token = decryptKey(s.telegramBotToken);
+    if (!token || !s.telegramChatId) return { ok: false, error: "Bot token / Chat ID belum diisi" };
+    return post(token, s.telegramChatId, "✅ <b>Masjavas terhubung.</b>\nNotifikasi render aktif.");
   },
   /** Notify that one render job finished. No-op if disabled or unconfigured. Never throws. */
   async notifyRenderDone(opts) {
     const s = await configService.getAll();
-    if (!s.telegramEnabled || !s.telegramBotToken || !s.telegramChatId) return;
+    const token = decryptKey(s.telegramBotToken);
+    if (!s.telegramEnabled || !token || !s.telegramChatId) return;
     let waitingProjects = 0;
     try {
       const { renderQueueService: renderQueueService2 } = await Promise.resolve().then(() => renderQueue_service);
@@ -1211,7 +1249,7 @@ const telegramService = {
       `📦 Batch: ${opts.index + 1}/${opts.total}${batchLeft > 0 ? ` · ${batchLeft} lagi` : ""}`
     ];
     if (waitingProjects > 0) lines.push(`🗂️ Antrian project: ${waitingProjects} menunggu`);
-    await post(s.telegramBotToken, s.telegramChatId, lines.join("\n"));
+    await post(token, s.telegramChatId, lines.join("\n"));
   }
 };
 const PRESETS = {
@@ -2415,7 +2453,6 @@ function buildBeatEffectFilter(footage, beats, videoIn, W, H, periodicInterval, 
     const phase = `mod(T-${off}+${iv},${iv})`;
     strengthExpr = `(max(0,1-${phase}/${DECAY_SEC.toFixed(3)})*${intensity.toFixed(3)})`;
   } else {
-    beats.map((b) => `between(T,${b.toFixed(3)},${(b + DECAY_SEC).toFixed(3)})`).join("+");
     const strengthTerms = beats.map(
       (b) => `max(0,1-(T-${b.toFixed(3)})/${DECAY_SEC.toFixed(3)})`
     ).join(",");
@@ -2661,6 +2698,7 @@ function escapeSubtitlesPath(p) {
 class RenderService {
   current = null;
   cancelled = false;
+  isRendering = false;
   emit(win, p) {
     win?.webContents.send(IPC.renderEvent, p);
   }
@@ -2674,38 +2712,74 @@ class RenderService {
   async cancel() {
     this.cancelled = true;
     if (this.current) {
+      const proc = this.current;
       try {
-        this.current.kill("SIGKILL");
-      } catch {
-      }
+        if (proc.stdin && proc.stdin.writable) {
+          proc.stdin.write("q");
+        }
+      } catch {}
+      try {
+        proc.kill("SIGTERM");
+      } catch {}
+      setTimeout(() => {
+        try {
+          if (proc.exitCode === null) {
+            proc.kill("SIGKILL");
+          }
+        } catch {}
+      }, 5000);
     }
   }
   async render(win, project, jobs) {
-    this.cancelled = false;
-    const ffmpeg = await ffmpegService.resolvedPath();
-    if (!ffmpeg) {
-      this.emit(win, baseProgress(jobs[0]?.jobId || "na", 0, jobs.length, "", "error", "FFmpeg not found"));
+    if (this.isRendering) {
+      this.emit(win, baseProgress(jobs[0]?.jobId || "na", 0, jobs.length, "", "error", "Render sudah berjalan"));
       return;
     }
-    const hw = await hardwareService.detect();
-    const settings = await configService.getAll();
-    let encoderId = hw.selectedEncoder;
-    if (project.export.encoder !== "auto") {
-      const sel = hw.encoders.find((e) => e.id === project.export.encoder && e.available);
-      encoderId = sel ? sel.id : hw.selectedEncoder;
-    }
-    for (let i = 0; i < jobs.length; i++) {
-      if (this.cancelled) {
-        this.emit(win, baseProgress(jobs[i].jobId, i, jobs.length, jobs[i].outputPath, "cancelled"));
-        break;
+    this.isRendering = true;
+    this.cancelled = false;
+    
+    // Disk space check: require at least 500MB free in userData directory
+    try {
+      const stats = await node_fs.promises.statfs(electron.app.getPath("userData"));
+      const freeSpaceBytes = stats.bavail * stats.frsize;
+      if (freeSpaceBytes < 500 * 1024 * 1024) {
+        throw new Error(`Ruang penyimpanan tidak mencukupi untuk render. Membutuhkan minimal 500 MB (Tersedia: ${(freeSpaceBytes / 1024 / 1024).toFixed(1)} MB).`);
       }
-      const job = jobs[i];
-      job.outputPath = uniqueOutput(job.outputPath);
-      const fileName = basename(job.outputPath);
-      const t0 = Date.now();
-      const tmpDir = node_path.join(electron.app.getPath("userData"), "cache", "render", job.jobId);
-      try {
-        await node_fs.promises.mkdir(tmpDir, { recursive: true });
+    } catch (err) {
+      if (err.message.includes("Ruang penyimpanan tidak mencukupi")) {
+        this.emit(win, baseProgress(jobs[0]?.jobId || "na", 0, jobs.length, "", "error", err.message));
+        this.isRendering = false;
+        return;
+      }
+      console.warn("Disk space check failed to run:", err);
+    }
+
+    try {
+      const ffmpeg = await ffmpegService.resolvedPath();
+      if (!ffmpeg) {
+        this.emit(win, baseProgress(jobs[0]?.jobId || "na", 0, jobs.length, "", "error", "FFmpeg not found"));
+        return;
+      }
+      const hw = await hardwareService.detect();
+      const settings = await configService.getAll();
+      let encoderId = hw.selectedEncoder;
+      if (project.export.encoder !== "auto") {
+        const sel = hw.encoders.find((e) => e.id === project.export.encoder && e.available);
+        encoderId = sel ? sel.id : hw.selectedEncoder;
+      }
+      for (let i = 0; i < jobs.length; i++) {
+        if (this.cancelled) {
+          this.emit(win, baseProgress(jobs[i].jobId, i, jobs.length, jobs[i].outputPath, "cancelled"));
+          break;
+        }
+        const job = jobs[i];
+        job.outputPath = uniqueOutput(job.outputPath);
+        const fileName = basename(job.outputPath);
+        const t0 = Date.now();
+        const tmpDir = node_path.join(electron.app.getPath("userData"), "cache", "render", job.jobId);
+        let success = false;
+        try {
+          await node_fs.promises.mkdir(tmpDir, { recursive: true });
         this.emit(win, {
           ...baseProgress(job.jobId, i, jobs.length, fileName, "preparing"),
           task: "Preparing audio"
@@ -3037,6 +3111,7 @@ class RenderService {
           outputPath: job.outputPath
         });
         void telegramService.notifyRenderDone({ fileName, elapsedMs, index: i, total: jobs.length });
+        success = true;
       } catch (e) {
         if (this.cancelled) {
           this.emit(win, baseProgress(job.jobId, i, jobs.length, fileName, "cancelled"));
@@ -3046,7 +3121,19 @@ class RenderService {
           ...baseProgress(job.jobId, i, jobs.length, fileName, "error"),
           error: e.message
         });
+      } finally {
+        if (!success || this.cancelled) {
+          try {
+            await node_fs.promises.rm(job.outputPath, { force: true }).catch(() => {});
+          } catch {}
+        }
+        try {
+          await node_fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+        } catch {}
       }
+    }
+    } finally {
+      this.isRendering = false;
     }
   }
   async buildArgs(project, job, duration, encoderId, quality, timeline, tmpDir, log, baseVideoPath = null, prerendered = [], phase = "single", baseWindow, audioMapPath) {
@@ -4431,16 +4518,15 @@ function registerIpcHandlers(getWindow) {
     const s = await configService.getAll();
     return {
       ...s,
-      groqApiKey: maskApiKey(decryptKey(s.groqApiKey))
+      groqApiKey: maskApiKey(decryptKey(s.groqApiKey)),
+      telegramBotToken: maskApiKey(decryptKey(s.telegramBotToken))
     };
   });
   electron.ipcMain.handle(IPC.settingsSet, async (_e, patch) => {
     let finalPatch = { ...patch };
     if ("groqApiKey" in patch) {
       const newKey = patch.groqApiKey;
-      const currentSettings = await configService.getAll();
       if (newKey && newKey.includes("****")) {
-        // user didn't change it, keep existing key
         delete finalPatch.groqApiKey;
       } else if (!newKey) {
         finalPatch.groqApiKey = "";
@@ -4448,12 +4534,23 @@ function registerIpcHandlers(getWindow) {
         finalPatch.groqApiKey = encryptKey(newKey);
       }
     }
+    if ("telegramBotToken" in patch) {
+      const newKey = patch.telegramBotToken;
+      if (newKey && newKey.includes("****")) {
+        delete finalPatch.telegramBotToken;
+      } else if (!newKey) {
+        finalPatch.telegramBotToken = "";
+      } else {
+        finalPatch.telegramBotToken = encryptKey(newKey);
+      }
+    }
     const updated = await configService.set(finalPatch);
     if ("ffmpegPath" in patch) await ffmpegService.detect(true);
     if ("ffmpegPath" in patch || "encoderPreference" in patch) await hardwareService.detect(true);
     return {
       ...updated,
-      groqApiKey: maskApiKey(decryptKey(updated.groqApiKey))
+      groqApiKey: maskApiKey(decryptKey(updated.groqApiKey)),
+      telegramBotToken: maskApiKey(decryptKey(updated.telegramBotToken))
     };
   });
   electron.ipcMain.handle(IPC.telegramTest, () => telegramService.test());
