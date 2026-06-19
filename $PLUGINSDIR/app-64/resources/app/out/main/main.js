@@ -2608,6 +2608,13 @@ async function copyUserFontsTo(fntDest) {
   } catch {
   }
 }
+
+function escapeSubtitlesPath(p) {
+  let escaped = String(p).replace(/\\/g, "/");
+  escaped = escaped.replace(/:/g, "\\:");
+  escaped = escaped.replace(/'/g, "'\\''");
+  return "'" + escaped + "'";
+}
 class RenderService {
   current = null;
   cancelled = false;
@@ -3393,12 +3400,7 @@ class RenderService {
    * Path C2 (subtitles or stickers present): a light single decode + libass/overlay
    * pass — trivial graph, GPU-encode-bound (the floor), not the old heavy multigraph.
    */
-function escapeSubtitlesPath(p) {
-  let escaped = p.replace(/\\/g, "/");
-  escaped = escaped.replace(/:/g, "\\:");
-  escaped = escaped.replace(/'/g, "'\\''");
-  return `'${escaped}'`;
-}
+
 
   async buildFinalArgs(project, job, duration, encoderId, quality, loopPath, tmpDir, loop = true, audioMapPath) {
     const exp = project.export;
