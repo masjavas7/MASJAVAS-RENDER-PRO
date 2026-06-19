@@ -1,8 +1,13 @@
-# MASJAVAS V1.7
+# MASJAVAS RENDER PRO
 
-MASJAVAS is a powerful desktop application featuring a video editor, audio visualizer, karaoke & playlist maker, batch renderer, and audio mastering tools. 
+MASJAVAS RENDER PRO is a powerful desktop application featuring a video editor, audio visualizer, karaoke & playlist maker, batch renderer, and audio mastering tools.
 
-Originally built as Sonara, this application has been fully rebranded to **MASJAVAS** and is ready for production deployment.
+Originally built as Sonara, this application has been fully rebranded to **MASJAVAS RENDER PRO (V1.7)** and is ready for production deployment.
+
+## Catatan Keamanan
+
+> [!IMPORTANT]
+> Jangan pernah mengunggah file `.env`, kredensial, token akses, atau informasi sensitif lainnya ke repositori publik. Selalu gunakan environment variables untuk mengelola kredensial seperti token bot Telegram atau API key eksternal.
 
 ## Features
 
