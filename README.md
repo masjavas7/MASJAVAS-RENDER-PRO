@@ -1,13 +1,26 @@
-# MASJAVAS RENDER PRO
+# MASJAVAS RENDER PRO (v1.7.2)
 
 MASJAVAS RENDER PRO is a powerful desktop application featuring a video editor, audio visualizer, karaoke & playlist maker, batch renderer, and audio mastering tools.
 
-MASJAVAS RENDER PRO (V1.7) is ready for production deployment.
+This version (`v1.7.2`) incorporates critical security hardening, observability logging, auto-recovery mechanisms, and a completely repaired lyrics/subtitle pipeline.
+
+---
+
+## 📖 Release Documentation
+
+For detailed guides, change logs, and release history:
+- [**Quick Start Guide**](file:///C:/Users/DELL/Documents/MASJAVAS-RENDER-PRO/QUICK_START.md) — Create your first visualizer video in 5 minutes.
+- [**Release Notes**](file:///C:/Users/DELL/Documents/MASJAVAS-RENDER-PRO/RELEASE_NOTES.md) — What's new in version 1.7.2.
+- [**Changelog**](file:///C:/Users/DELL/Documents/MASJAVAS-RENDER-PRO/CHANGELOG.md) — Chronological history of additions, changes, and fixes.
+
+---
 
 ## Catatan Keamanan
 
 > [!IMPORTANT]
 > Jangan pernah mengunggah file `.env`, kredensial, token akses, atau informasi sensitif lainnya ke repositori publik. Selalu gunakan environment variables untuk mengelola kredensial seperti token bot Telegram atau API key eksternal.
+
+---
 
 ## Features
 
@@ -19,6 +32,8 @@ MASJAVAS RENDER PRO (V1.7) is ready for production deployment.
 - **Batch Renderer**: Enqueue multiple video/audio processing jobs for sequential batch rendering.
 - **Telegram Notifications**: Receive live status updates for render queues directly on your Telegram channel/chat.
 
+---
+
 ## Tech Stack
 
 - **Frontend**: React + Vite (HTML, CSS, modern JS)
@@ -26,32 +41,41 @@ MASJAVAS RENDER PRO (V1.7) is ready for production deployment.
 - **Engine / Media Processing**: Node-canvas (`@napi-rs/canvas`) & FFmpeg/FFprobe binaries
 - **Design System**: Modern, responsive dark-mode dashboard interface
 
+---
+
 ## Project Structure
 
 ```
 MASJAVAS-RENDER-PRO/
 │
+├── installer.nsi                 # NSIS compiler configuration script
+├── build_installer.ps1          # Release build automation script
+│
 └── $PLUGINSDIR/
-    ├── nsis7z.dll                    # NSIS extraction helper
-    ├── StdUtils.dll                  # NSIS utility plugin
-    ├── System.dll                    # NSIS system plugin
-    ├── app-64.7z                     # Compressed portable package
-    └── app-64/                       # Uncompressed application directory
-        ├── MASJAVAS V1.7.exe         # Main application executable
-        ├── chrome_100_percent.pak    # Chromium resource package
-        ├── locales/                  # Language localization packages
-        └── resources/                # App resources
-            ├── app.asar              # Packaged Electron source code archive
-            ├── bin/                  # Embedded FFmpeg and FFprobe binaries
+    ├── nsis7z.dll                # NSIS extraction helper
+    ├── StdUtils.dll              # NSIS utility plugin
+    ├── System.dll                # NSIS system plugin
+    ├── app-64.7z                 # Compressed portable package
+    └── app-64/                   # Uncompressed application directory
+        ├── MASJAVAS V1.7.exe     # Main application executable
+        ├── chrome_100_percent.pak# Chromium resource package
+        ├── locales/              # Language localization packages
+        └── resources/            # App resources
+            ├── app.asar          # Packaged Electron source code archive
+            ├── bin/              # Embedded FFmpeg and FFprobe binaries
             ├── fonts/                # Built-in font library
             └── sidecar/              # Sidecar services (masjavas-sidecar.exe)
 ```
+
+---
 
 ## How to Run (Portable Mode)
 
 To run the portable application directly:
 1. Navigate to `$PLUGINSDIR/app-64/`
 2. Double-click `MASJAVAS V1.7.exe`
+
+---
 
 ## Development & Build
 
@@ -66,6 +90,8 @@ To modify the code:
    ```bash
    npx @electron/asar pack app app.asar
    ```
+
+---
 
 ## License and Author
 
