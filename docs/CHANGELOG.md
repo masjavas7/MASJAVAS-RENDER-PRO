@@ -6,6 +6,9 @@ All notable architectural upgrades and critical fixes implemented for MASJAVAS R
 
 ## [v1.7.2] - 2026-06-20
 
+### Fixed
+* **Disk Space Check**: Fixed a critical bug where the disk space check displayed "Kurang (NaNMB)" on Windows machines and blocked the render queue, caused by `statfs` returning an undefined fundamental block size (`frsize`). Defensive fallbacks (`stats.frsize || stats.bsize || 4096`) and explicit type casting were implemented across all disk check locations.
+
 ### Added
 * **Panduan Memulai Cepat (Onboarding)**: Added a collapsible, user-friendly onboarding checklist banner on the HomeScreen for first-time users.
 * **Prasyarat Render Checklist**: Introduced a checklist in the Render Panel that checks audio, footage, and disk storage space (minimum 500 MB) in real-time, preventing renders unless prerequisites are met.

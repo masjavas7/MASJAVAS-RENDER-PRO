@@ -2820,7 +2820,8 @@ class RenderService {
     // Disk space check: require at least 500MB free in userData directory
     try {
       const stats = await node_fs.promises.statfs(electron.app.getPath("userData"));
-      const freeSpaceBytes = stats.bavail * stats.frsize;
+      const blockSize = stats.frsize || stats.bsize || 4096;
+      const freeSpaceBytes = Number(stats.bavail || 0) * Number(blockSize);
       if (freeSpaceBytes < 500 * 1024 * 1024) {
         throw new Error(`Ruang penyimpanan tidak mencukupi untuk render. Membutuhkan minimal 500 MB (Tersedia: ${(freeSpaceBytes / 1024 / 1024).toFixed(1)} MB).`);
       }
@@ -4814,7 +4815,8 @@ function registerIpcHandlers(getWindow) {
     let freeMb = 0;
     try {
       const stats = await node_fs.promises.statfs(electron.app.getPath("userData"));
-      freeMb = Math.round((stats.bavail * stats.frsize) / (1024 * 1024));
+      const blockSize = stats.frsize || stats.bsize || 4096;
+      freeMb = Math.round((Number(stats.bavail || 0) * Number(blockSize)) / (1024 * 1024));
       diskOk = freeMb >= 500;
     } catch {}
 
@@ -4945,7 +4947,8 @@ function registerIpcHandlers(getWindow) {
     let freeMb = 0;
     try {
       const stats = await node_fs.promises.statfs(electron.app.getPath("userData"));
-      freeMb = Math.round((stats.bavail * stats.frsize) / (1024 * 1024));
+      const blockSize = stats.frsize || stats.bsize || 4096;
+      freeMb = Math.round((Number(stats.bavail || 0) * Number(blockSize)) / (1024 * 1024));
       diskOk = freeMb >= 500;
     } catch {}
 
