@@ -21,3 +21,8 @@ temp/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Setup Installers
+MASJAVAS-RENDER-PRO-Setup-v*.exe
+MASJAVAS-RENDER-PRO-Setup-v*.exe.sha256
+dist/
