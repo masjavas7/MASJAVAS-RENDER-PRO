@@ -1164,6 +1164,107 @@ const EDGE_PUNCT = /^[\s,.;:!?،۔。、「」“”"…~*]+|[\s,.;:!?،۔。、
 function cleanLyricText(s) {
   return (s || "").replace(EDGE_PUNCT, "").replace(/\s{2,}/g, " ");
 }
+function normalizeLyrics(input, audioDuration) {
+  let rawLines = [];
+  if (!input) {
+    return { enabled: true, showLyrics: true, lines: [] };
+  }
+  if (typeof input === "string") {
+    if (input.includes("[") && input.includes("]")) {
+      rawLines = parseLrc(input);
+    } else if (input.includes("-->")) {
+      rawLines = parseSrt(input);
+    } else {
+      rawLines = parseTxt(input);
+    }
+  } else if (Array.isArray(input)) {
+    rawLines = input;
+  } else if (typeof input === "object") {
+    if (Array.isArray(input.lines)) {
+      rawLines = input.lines;
+    } else if (Array.isArray(input.segments)) {
+      rawLines = input.segments.map((seg, idx) => ({
+        t: seg.start,
+        end: seg.end,
+        text: seg.text || "",
+        words: seg.words ? seg.words.map(w => ({ t: w.start ?? w.t, end: w.end, text: w.word ?? w.text })) : undefined
+      }));
+    } else if (typeof input.content === "string") {
+      rawLines = normalizeLyrics(input.content, audioDuration).lines;
+    } else if (Array.isArray(input.timestamps)) {
+      rawLines = input.timestamps;
+    } else {
+      rawLines = [];
+    }
+  }
+  let lines = rawLines.map((line, idx) => {
+    if (!line) return null;
+    let text = typeof line === "string" ? line : (line.text || line.word || "");
+    text = cleanLyricText(text);
+    if (!text) return null;
+    let t = typeof line.t === "number" && !isNaN(line.t) ? line.t : (line.start ?? -1);
+    let end = typeof line.end === "number" && !isNaN(line.end) ? line.end : -1;
+    let words = undefined;
+    if (Array.isArray(line.words)) {
+      words = line.words.map(w => {
+        const wText = cleanLyricText(w.text || w.word || "");
+        if (!wText) return null;
+        const wt = typeof w.t === "number" && !isNaN(w.t) ? w.t : (w.start ?? -1);
+        const wend = typeof w.end === "number" && !isNaN(w.end) ? w.end : -1;
+        return { text: wText, t: wt, end: wend };
+      }).filter(Boolean);
+    }
+    return {
+      id: line.id || `line-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      text,
+      t,
+      end,
+      words
+    };
+  }).filter(Boolean);
+  const dur = typeof audioDuration === "number" && audioDuration > 0 ? audioDuration : (lines.length * 4 || 15);
+  const hasNoTimings = lines.every(l => l.t < 0);
+  if (hasNoTimings) {
+    const perLine = dur / Math.max(1, lines.length);
+    lines = lines.map((l, i) => {
+      const startT = i * perLine;
+      const endT = (i + 1) * perLine;
+      let words = l.words;
+      if (words && words.length > 0) {
+        const perWord = perLine / words.length;
+        words = words.map((w, wi) => ({
+          text: w.text,
+          t: startT + wi * perWord,
+          end: startT + (wi + 1) * perWord
+        }));
+      }
+      return { ...l, t: startT, end: endT, words };
+    });
+  } else {
+    lines.sort((a, b) => a.t - b.t);
+    for (let i = 0; i < lines.length; i++) {
+      const curr = lines[i];
+      if (curr.t < 0) {
+        curr.t = i > 0 ? lines[i - 1].end : 0;
+      }
+      if (curr.end <= curr.t) {
+        const nextStart = lines[i + 1]?.t;
+        curr.end = nextStart && nextStart > curr.t ? nextStart : Math.min(dur, curr.t + 4);
+      }
+      if (curr.words && curr.words.length > 0) {
+        const lineDur = curr.end - curr.t;
+        const perWord = lineDur / curr.words.length;
+        curr.words = curr.words.map((w, wi) => {
+          let wt = w.t >= 0 ? w.t : curr.t + wi * perWord;
+          let wend = w.end > wt ? w.end : curr.t + (wi + 1) * perWord;
+          return { text: w.text, t: wt, end: wend };
+        });
+      }
+    }
+  }
+  lines.sort((a, b) => a.t - b.t);
+  return { enabled: true, showLyrics: true, lines };
+}
 const GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const MODEL = "whisper-large-v3-turbo";
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -1985,7 +2086,7 @@ function buildLyricsAss(cfg, width, height, duration = 0) {
   const hi = assColor(cfg.highlightColor);
   const base = assColor(style.color, style.opacity);
   const posOverride = style.position === "custom" ? `\\pos(${Math.round(width * style.posX)},${Math.round(height * style.posY)})` : "";
-  const useWordMode = cfg.highlightMode === "word";
+  const useWordMode = false;
   const strokeC = assColor(style.strokeColor);
   for (let i = 0; i < cfg.lines.length; i++) {
     const line = cfg.lines[i];
@@ -3530,7 +3631,8 @@ class RenderService {
     showPlaylist(project) && project.playlist.items.length > 0;
     const subFiles = [];
     if (!isLoop && wantLyrics) {
-      await node_fs.promises.writeFile(node_path.join(tmpDir, "sub_l.ass"), "\uFEFF" + buildLyricsAss(project.lyrics, W, H, duration), "utf-8");
+      const normalized = normalizeLyrics(project.lyrics, duration);
+      await node_fs.promises.writeFile(node_path.join(tmpDir, "sub_l.ass"), "\uFEFF" + buildLyricsAss(normalized, W, H, duration), "utf-8");
       subFiles.push("sub_l.ass");
     }
     if (subFiles.length) {
@@ -3653,7 +3755,8 @@ class RenderService {
     let lastVideo = "[0:v]";
     const subFiles = [];
     if (hasLyrics) {
-      await node_fs.promises.writeFile(node_path.join(tmpDir, "sub_l.ass"), "\uFEFF" + buildLyricsAss(project.lyrics, W, H, duration), "utf-8");
+      const normalized = normalizeLyrics(project.lyrics, duration);
+      await node_fs.promises.writeFile(node_path.join(tmpDir, "sub_l.ass"), "\uFEFF" + buildLyricsAss(normalized, W, H, duration), "utf-8");
       subFiles.push("sub_l.ass");
     }
     if (subFiles.length) {

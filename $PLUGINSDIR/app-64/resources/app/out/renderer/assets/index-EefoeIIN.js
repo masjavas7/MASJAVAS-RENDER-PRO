@@ -8256,16 +8256,12 @@ function LyricsPanel() {
     if (!sel.length) return;
     try {
       let lines = await window.masjavas.parseLyrics(sel[0]);
-      if (lines.length && lines[0].t < 0) {
-        const audio = project.audio.items[0];
-        let dur = audio?.duration;
-        if (audio && !dur) dur = (await window.masjavas.probe(audio.path)).duration;
-        dur = dur || lines.length * 4;
-        const per = dur / lines.length;
-        lines = lines.map((l2, i) => ({ t: i * per, end: (i + 1) * per, text: l2.text }));
-      }
-      patchProject((p2) => (p2.lyrics.file = sel[0], p2.lyrics.lines = lines, p2.showLyrics = true, p2));
-      toast("success", `${lines.length} baris lirik berhasil dimuat.`);
+      const audio = project.audio.items[0];
+      let dur = audio?.duration;
+      if (audio && !dur) dur = (await window.masjavas.probe(audio.path)).duration;
+      const normalized = normalizeLyrics(lines, dur);
+      patchProject((p2) => (p2.lyrics.file = sel[0], p2.lyrics.lines = normalized.lines, p2.showLyrics = true, p2));
+      toast("success", `${normalized.lines.length} baris lirik berhasil dimuat.`);
     } catch (e) {
       toast("error", e.message);
     }
@@ -8302,14 +8298,18 @@ function LyricsPanel() {
           const ok2 = mapped.filter((r2) => r2.lines.length > 0).length;
           toast(ok2 > 0 ? "success" : "error", `${ok2}/${paths.length} track berhasil ditranskrip.`);
           const first = mapped.find((r2) => r2.lines.length > 0);
-          if (first) patchProject((p2) => (p2.lyrics.lines = first.lines, p2.lyrics.file = first.path, p2.showLyrics = true, p2));
+          if (first) {
+            const normalized = normalizeLyrics(first.lines, audioItems[0]?.duration);
+            patchProject((p2) => (p2.lyrics.lines = normalized.lines, p2.lyrics.file = first.path, p2.showLyrics = true, p2));
+          }
         } else {
           const r2 = mapped[0];
           if (!r2.lines.length) {
             toast("info", r2.error ? `Groq error: ${r2.error}` : "Vokal tidak terdeteksi. Coba rekaman yang lebih bersih atau ubah bahasa.");
           } else {
-            patchProject((p2) => (p2.lyrics.lines = r2.lines, p2.lyrics.file = r2.path, p2.showLyrics = true, p2));
-            toast("success", `${r2.lines.length} baris lirik berhasil dihasilkan via Groq.`);
+            const normalized = normalizeLyrics(r2.lines, audioItems[0]?.duration);
+            patchProject((p2) => (p2.lyrics.lines = normalized.lines, p2.lyrics.file = r2.path, p2.showLyrics = true, p2));
+            toast("success", `${normalized.lines.length} baris lirik berhasil dihasilkan via Groq.`);
           }
         }
       } catch (e) {
@@ -8336,8 +8336,9 @@ function LyricsPanel() {
         setTranscribeStatus("");
         return;
       }
-      patchProject((p2) => (p2.lyrics.lines = res.lines, p2.lyrics.file = audio.path, p2.showLyrics = true, p2));
-      toast("success", `${res.lines.length} baris lirik berhasil dihasilkan.`);
+      const normalized = normalizeLyrics(res.lines, audio?.duration);
+      patchProject((p2) => (p2.lyrics.lines = normalized.lines, p2.lyrics.file = audio.path, p2.showLyrics = true, p2));
+      toast("success", `${normalized.lines.length} baris lirik berhasil dihasilkan.`);
       setTranscribeStatus("");
     } catch (e) {
       toast("error", e.message);
@@ -8462,7 +8463,10 @@ function LyricsPanel() {
               {
                 className: "btn",
                 style: { padding: "2px 8px", fontSize: 10 },
-                onClick: () => patchProject((p2) => (p2.lyrics.lines = r2.lines, p2.lyrics.file = r2.path, p2)),
+                onClick: () => {
+                  const normalized = normalizeLyrics(r2.lines, project.audio.items.find((a) => a.path === r2.path)?.duration);
+                  patchProject((p2) => (p2.lyrics.lines = normalized.lines, p2.lyrics.file = r2.path, p2.showLyrics = true, p2));
+                },
                 children: "Gunakan"
               }
             )
@@ -11667,6 +11671,151 @@ const EDGE_PUNCT = /^[\s,.;:!?،۔。、「」“”"…~*]+|[\s,.;:!?،۔。、
 function cleanLyricText(s) {
   return (s || "").replace(EDGE_PUNCT, "").replace(/\s{2,}/g, " ");
 }
+function parseLrc(text) {
+  const lines = [];
+  const re = /\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+  for (const raw of text.split(/\r?\n/)) {
+    const matches = [...raw.matchAll(re)];
+    if (!matches.length) continue;
+    const content = raw.replace(re, "").trim();
+    for (const m of matches) {
+      const min = parseInt(m[1], 10);
+      const sec = parseInt(m[2], 10);
+      const frac = m[3] ? parseInt(m[3].padEnd(3, "0"), 10) / 1e3 : 0;
+      const t = min * 60 + sec + frac;
+      lines.push({ t, end: 0, text: content });
+    }
+  }
+  lines.sort((a, b) => a.t - b.t);
+  for (let i = 0; i < lines.length; i++) lines[i].end = lines[i + 1]?.t ?? lines[i].t + 4;
+  return lines.filter((l) => l.text.length > 0);
+}
+function srtTime(s) {
+  const m = /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/.exec(s);
+  if (!m) return 0;
+  return parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseInt(m[3]) + parseInt(m[4]) / 1e3;
+}
+function parseSrt(text) {
+  const lines = [];
+  const blocks = text.split(/\r?\n\r?\n/);
+  for (const block of blocks) {
+    const rows = block.split(/\r?\n/).filter(Boolean);
+    const timeRow = rows.find((r) => r.includes("-->"));
+    if (!timeRow) continue;
+    const [a, b] = timeRow.split("-->");
+    const t = srtTime(a);
+    const end = srtTime(b);
+    const textRows = rows.slice(rows.indexOf(timeRow) + 1);
+    const content = textRows.join(" ").trim();
+    if (content) lines.push({ t, end, text: content });
+  }
+  return lines;
+}
+function parseTxt(text) {
+  const rows = text.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
+  return rows.map((text2) => ({ t: -1, end: -1, text: text2 }));
+}
+function normalizeLyrics(input, audioDuration) {
+  let rawLines = [];
+  if (!input) {
+    return { enabled: true, showLyrics: true, lines: [] };
+  }
+  if (typeof input === "string") {
+    if (input.includes("[") && input.includes("]")) {
+      rawLines = parseLrc(input);
+    } else if (input.includes("-->")) {
+      rawLines = parseSrt(input);
+    } else {
+      rawLines = parseTxt(input);
+    }
+  } else if (Array.isArray(input)) {
+    rawLines = input;
+  } else if (typeof input === "object") {
+    if (Array.isArray(input.lines)) {
+      rawLines = input.lines;
+    } else if (Array.isArray(input.segments)) {
+      rawLines = input.segments.map((seg, idx) => ({
+        t: seg.start,
+        end: seg.end,
+        text: seg.text || "",
+        words: seg.words ? seg.words.map(w => ({ t: w.start ?? w.t, end: w.end, text: w.word ?? w.text })) : undefined
+      }));
+    } else if (typeof input.content === "string") {
+      rawLines = normalizeLyrics(input.content, audioDuration).lines;
+    } else if (Array.isArray(input.timestamps)) {
+      rawLines = input.timestamps;
+    } else {
+      rawLines = [];
+    }
+  }
+  let lines = rawLines.map((line, idx) => {
+    if (!line) return null;
+    let text = typeof line === "string" ? line : (line.text || line.word || "");
+    text = cleanLyricText(text);
+    if (!text) return null;
+    let t = typeof line.t === "number" && !isNaN(line.t) ? line.t : (line.start ?? -1);
+    let end = typeof line.end === "number" && !isNaN(line.end) ? line.end : -1;
+    let words = undefined;
+    if (Array.isArray(line.words)) {
+      words = line.words.map(w => {
+        const wText = cleanLyricText(w.text || w.word || "");
+        if (!wText) return null;
+        const wt = typeof w.t === "number" && !isNaN(w.t) ? w.t : (w.start ?? -1);
+        const wend = typeof w.end === "number" && !isNaN(w.end) ? w.end : -1;
+        return { text: wText, t: wt, end: wend };
+      }).filter(Boolean);
+    }
+    return {
+      id: line.id || `line-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      text,
+      t,
+      end,
+      words
+    };
+  }).filter(Boolean);
+  const dur = typeof audioDuration === "number" && audioDuration > 0 ? audioDuration : (lines.length * 4 || 15);
+  const hasNoTimings = lines.every(l => l.t < 0);
+  if (hasNoTimings) {
+    const perLine = dur / Math.max(1, lines.length);
+    lines = lines.map((l, i) => {
+      const startT = i * perLine;
+      const endT = (i + 1) * perLine;
+      let words = l.words;
+      if (words && words.length > 0) {
+        const perWord = perLine / words.length;
+        words = words.map((w, wi) => ({
+          text: w.text,
+          t: startT + wi * perWord,
+          end: startT + (wi + 1) * perWord
+        }));
+      }
+      return { ...l, t: startT, end: endT, words };
+    });
+  } else {
+    lines.sort((a, b) => a.t - b.t);
+    for (let i = 0; i < lines.length; i++) {
+      const curr = lines[i];
+      if (curr.t < 0) {
+        curr.t = i > 0 ? lines[i - 1].end : 0;
+      }
+      if (curr.end <= curr.t) {
+        const nextStart = lines[i + 1]?.t;
+        curr.end = nextStart && nextStart > curr.t ? nextStart : Math.min(dur, curr.t + 4);
+      }
+      if (curr.words && curr.words.length > 0) {
+        const lineDur = curr.end - curr.t;
+        const perWord = lineDur / curr.words.length;
+        curr.words = curr.words.map((w, wi) => {
+          let wt = w.t >= 0 ? w.t : curr.t + wi * perWord;
+          let wend = w.end > wt ? w.end : curr.t + (wi + 1) * perWord;
+          return { text: w.text, t: wt, end: wend };
+        });
+      }
+    }
+  }
+  lines.sort((a, b) => a.t - b.t);
+  return { enabled: true, showLyrics: true, lines };
+}
 function fakeSpectrumFrame(bands, t2, bpm = 90) {
   const beat = 60 / bpm;
   const phase = t2 % beat / beat;
@@ -13443,34 +13592,6 @@ function drawLyrics(ctx, project, t2, W2, H2, nowMs = 0) {
   const scH = H2 / 1080;
   const lineStep = style.fontSize * 1.4 * scH;
   const anim = animation ?? "fade";
-  if (highlightMode === "word") {
-    const line = lines[activeIdx];
-    if (t2 < line.t || t2 > line.end + 0.05) return;
-    const words = (line.words ?? []).map((w2) => ({ t: w2.t, end: w2.end, text: cleanLyricText(w2.text) })).filter((w2) => w2.text);
-    let display;
-    let color;
-    if (words.length > 0) {
-      let wi2 = -1;
-      for (let k2 = 0; k2 < words.length; k2++) if (t2 >= words[k2].t) wi2 = k2;
-      display = words[wi2 === -1 ? 0 : wi2].text;
-      color = wi2 === -1 ? style.color : highlightColor;
-    } else {
-      display = cleanLyricText(line.text);
-      color = highlightColor;
-    }
-    if (!display) return;
-    ctx.save();
-    applyTextStyle(ctx, style, color, H2);
-    if (style.strokeWidth > 0) {
-      ctx.strokeStyle = style.strokeColor;
-      ctx.lineWidth = style.strokeWidth * scH * 2;
-      ctx.lineJoin = "round";
-      ctx.strokeText(display, x2, baseY);
-    }
-    ctx.fillText(display, x2, baseY);
-    ctx.restore();
-    return;
-  }
   const range = [-1, 0, 1];
   for (const d of range) {
     const idx = activeIdx + d;
@@ -13497,7 +13618,7 @@ function drawLyrics(ctx, project, t2, W2, H2, nowMs = 0) {
       ctx.scale(scaleXY, scaleXY);
       ctx.translate(-x2, -(lineY + offsetY));
     }
-    const sweepWords = isActuallyActive ? (line.words ?? []).map((w2) => ({ t: w2.t, end: w2.end, text: cleanLyricText(w2.text) })).filter((w2) => w2.text) : [];
+    const sweepWords = (isActuallyActive && highlightMode === "word") ? (line.words ?? []).map((w2) => ({ t: w2.t, end: w2.end, text: cleanLyricText(w2.text) })).filter((w2) => w2.text) : [];
     if (isActuallyActive && sweepWords.length > 0) {
       ctx.font = `700 ${style.fontSize * scH}px ${style.fontFamily}, sans-serif`;
       ctx.textBaseline = "middle";
