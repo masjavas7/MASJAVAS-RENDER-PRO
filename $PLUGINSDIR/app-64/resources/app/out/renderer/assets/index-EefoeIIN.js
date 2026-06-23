@@ -13063,7 +13063,7 @@ function PreviewPanel() {
       }
     }
   };
-  const spectrumActive = !!(project?.spectrum.enabled || project?.logo.enabled);
+  const spectrumActive = !!(project?.spectrum.enabled || project?.logo.enabled || (project?.spectrumLayers ?? []).some((l) => l.enabled));
   const loadSpectrum = reactExports.useCallback(async (silent = false) => {
     const curProject = projectRef.current;
     const curAudioItem = curProject?.audio.items[0] ?? null;
@@ -13077,7 +13077,13 @@ function PreviewPanel() {
     }
     setLoading(true);
     try {
-      const bands = Math.max(16, Math.min(160, curProject?.spectrum.bars ?? 64));
+      const maxBars = Math.max(
+        curProject?.spectrum.enabled ? curProject.spectrum.bars : 16,
+        curProject?.logo.enabled ? curProject.logo.bars : 16,
+        ...(curProject?.spectrumLayers ?? []).filter((l) => l.enabled).map((l) => l.bars),
+        64
+      );
+      const bands = Math.max(16, Math.min(160, maxBars));
       const frames = await window.masjavas.getSpectrum(curAudioItem.path, PREVIEW_FPS, bands);
       setSpectrum(frames);
       setSpectrumLoaded(true);
@@ -13231,13 +13237,16 @@ function PreviewPanel() {
         ctx.fillRect(0, 0, W2, H2);
       }
       ctx.restore();
-      if (proj.effects.vignette > 0.01) {
-        const g = ctx.createRadialGradient(W2 / 2, H2 / 2, Math.min(W2, H2) * 0.3, W2 / 2, H2 / 2, Math.max(W2, H2) * 0.7);
-        g.addColorStop(0, "rgba(0,0,0,0)");
-        g.addColorStop(1, `rgba(0,0,0,${(proj.effects.vignette * 0.85).toFixed(2)})`);
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, W2, H2);
+
+      if (proj.effects.glow > 0.01) {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = Math.min(0.9, proj.effects.glow * 0.75);
+        ctx.filter = `blur(${Math.max(1, Math.round(proj.effects.glow * 14))}px)`;
+        ctx.drawImage(canvasRef.current, 0, 0);
+        ctx.restore();
       }
+
       const vIntro = introVideoRef.current;
       if (vIntro && introDurRef.current > 0 && t2 <= introDurRef.current) {
         if (Math.abs(vIntro.currentTime - t2) > 0.15) {
@@ -13286,13 +13295,8 @@ function PreviewPanel() {
         const fi2 = Math.min(spec.frames.length - 1, Math.max(0, Math.floor(tt * spec.fps)));
         return spec.frames[fi2] || [];
       };
+      const rawFrame = realFrameAt(dummyOverlay) ?? fakeFrame(Math.max(16, Math.min(160, proj.spectrum.bars)), t2);
       let vals = [];
-      let rawFrame = null;
-      if (dummyOverlay) {
-        rawFrame = realFrameAt(true) ?? fakeFrame(Math.max(16, Math.min(160, proj.spectrum.bars)), t2);
-      } else if (spec && spec.frames.length) {
-        rawFrame = realFrameAt(false);
-      }
       if (rawFrame) {
         const raw = rawFrame;
         const cfg = proj.spectrum;
@@ -13305,12 +13309,22 @@ function PreviewPanel() {
           return smoothRef.current[i];
         });
       }
+      if (proj.logo.enabled && lImg) {
+        const logoFrame = realFrameAt(dummyOverlay) ?? fakeFrame(64, t2);
+        const rawBass = bassEnergy(logoFrame);
+        const useBeats = !dummyOverlay && beatsRef.current.length >= 4;
+        const onset = rawBass - prevLogoBassRef.current > 0.05;
+        prevLogoBassRef.current = rawBass;
+        const bassBeat = (useBeats ? beatFired : onset) && rawBass > 0.18;
+        if (bassBeat) logoBounceRef.current = 1;
+        logoBounceRef.current *= 0.8;
+        drawLogo(ctx, proj.logo, lImg, rawFrame ?? [], W2, H2, t2, rawBass, particleFieldRef.current, dtFrames, bassBeat, logoBounceRef.current);
+      }
       if (proj.spectrum.enabled && vals.length) {
         drawSpectrum(ctx, proj.spectrum, vals, W2, H2, t2);
       }
-      if (proj.spectrumLayers?.length && (dummyOverlay || spec?.frames.length)) {
-        const fi2 = spec?.frames.length ? Math.min(spec.frames.length - 1, Math.max(0, Math.floor(t2 * spec.fps))) : 0;
-        const rawVals = dummyOverlay ? realFrameAt(true) ?? fakeFrame(160, t2) : spec?.frames[fi2] || [];
+      if (proj.spectrumLayers?.length) {
+        const rawVals = realFrameAt(dummyOverlay) ?? fakeFrame(160, t2);
         for (const layer of proj.spectrumLayers) {
           if (!layer.enabled) continue;
           const buf = layerSmoothRef.current.get(layer.id) ?? [];
@@ -13321,25 +13335,13 @@ function PreviewPanel() {
       if (proj.overlayLayers?.length) {
         drawOverlayLayers(ctx, proj.overlayLayers, t2, W2, H2);
       }
-      if (proj.logo.enabled && lImg) {
-        let rawBass = 0;
-        if (dummyOverlay) {
-          rawBass = bassEnergy(realFrameAt(true) ?? fakeFrame(64, t2));
-        } else if (spec && spec.frames.length) {
-          const fi2 = Math.min(spec.frames.length - 1, Math.max(0, Math.floor(t2 * spec.fps)));
-          rawBass = bassEnergy(spec.frames[fi2] || []);
-        }
-        const useBeats = !dummyOverlay && beatsRef.current.length >= 4;
-        const onset = rawBass - prevLogoBassRef.current > 0.05;
-        prevLogoBassRef.current = rawBass;
-        const bassBeat = (useBeats ? beatFired : onset) && rawBass > 0.18;
-        if (bassBeat) logoBounceRef.current = 1;
-        logoBounceRef.current *= 0.8;
-        drawLogo(ctx, proj.logo, lImg, rawFrame ?? [], W2, H2, t2, rawBass, particleFieldRef.current, dtFrames, bassBeat, logoBounceRef.current);
+      if (proj.effects.vignette > 0.01) {
+        const g = ctx.createRadialGradient(W2 / 2, H2 / 2, Math.min(W2, H2) * 0.3, W2 / 2, H2 / 2, Math.max(W2, H2) * 0.7);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(1, `rgba(0,0,0,${(proj.effects.vignette * 0.85).toFixed(2)})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W2, H2);
       }
-      if (showLyrics(proj)) drawLyrics(ctx, proj, t2, W2, H2, rafTs);
-      if (showPlaylist(proj)) drawPlaylist(ctx, proj, t2, W2, H2, rafTs, dur, proj.audio.items);
-      drawCustomTexts(ctx, proj.customTexts, t2, W2, H2);
       const bEffectOverlay = proj.footage.beatEffect ?? "none";
       const overlayPresets = ["flash", "color-flash", "brightness-pulse", "vignette-pulse", "zoom-pulse", "shake", "rgb-split", "strobe-cut"];
       if (overlayPresets.includes(bEffectOverlay) && beatStrengthRef.current > 0.01) {
@@ -13347,7 +13349,6 @@ function PreviewPanel() {
         const strength = beatStrengthRef.current * intensity;
         drawBeatEffect(ctx, bEffectOverlay, strength, W2, H2, t2, strength, strength * 0.5);
       }
-      ctx.restore();
       const co = overlay2dRef.current;
       if (co) {
         try {
@@ -13355,6 +13356,10 @@ function PreviewPanel() {
         } catch {
         }
       }
+      if (showLyrics(proj)) drawLyrics(ctx, proj, t2, W2, H2, rafTs);
+      if (showPlaylist(proj)) drawPlaylist(ctx, proj, t2, W2, H2, rafTs, dur, proj.audio.items);
+      drawCustomTexts(ctx, proj.customTexts, t2, W2, H2);
+      ctx.restore();
       animId = requestAnimationFrame(draw);
     };
     animId = requestAnimationFrame(draw);
