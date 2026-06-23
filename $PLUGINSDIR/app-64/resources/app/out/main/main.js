@@ -702,6 +702,10 @@ const exportDefault = {
   cropY: 0.5,
   backgroundMode: "blur",
   backgroundColor: "#000000",
+  beginnerMode: true,
+  showSafeAreas: false,
+  showDeviceMockup: false,
+  multiExport: [],
   fps: 30,
   bitrate: "auto",
   encoder: "auto",
@@ -814,7 +818,11 @@ class ProjectService {
         cropY: data.export?.cropY ?? base.export.cropY,
         zoom: data.export?.zoom ?? base.export.zoom,
         backgroundMode: data.export?.backgroundMode ?? base.export.backgroundMode,
-        backgroundColor: data.export?.backgroundColor ?? base.export.backgroundColor
+        backgroundColor: data.export?.backgroundColor ?? base.export.backgroundColor,
+        beginnerMode: data.export?.beginnerMode ?? base.export.beginnerMode,
+        showSafeAreas: data.export?.showSafeAreas ?? base.export.showSafeAreas,
+        showDeviceMockup: data.export?.showDeviceMockup ?? base.export.showDeviceMockup,
+        multiExport: data.export?.multiExport ?? base.export.multiExport
       },
       stickers: data.stickers || [],
       // Migrate unified toggles from the legacy mode/batch when absent, so old projects
@@ -2267,7 +2275,15 @@ function header(width, height, style, fontScale = 1) {
   const align = alignment(style);
   const outline = Math.max(0, style.strokeWidth) * fontScale;
   const shadow = (style.shadow ? 3 : 0) * fontScale;
-  const marginV = style.marginV !== undefined ? style.marginV : Math.round(height * 0.1);
+  let marginV = style.marginV !== undefined ? style.marginV : Math.round(height * 0.1);
+  if (style.position === "bottom" && height > width) {
+    const ratio = height / width;
+    if (ratio > 1.5) {
+      marginV = Math.round(height * 0.22);
+    } else {
+      marginV = Math.round(height * 0.18);
+    }
+  }
   const family = resolveFamily(style.fontFamily);
   const fontSize = Math.round(style.fontSize * fontScale);
   return `[Script Info]
@@ -2303,7 +2319,16 @@ function buildLyricsAss(cfg, width, height, duration = 0, dna = "") {
   if (prng) {
     style.fontSize = style.fontSize * randRange(0.96, 1.04);
     style.strokeWidth = style.strokeWidth * randRange(0.90, 1.10);
-    style.marginV = Math.round(height * 0.1) + Math.round(randRange(-6, 6));
+    let baseMargin = Math.round(height * 0.1);
+    if (style.position === "bottom" && height > width) {
+      const ratio = height / width;
+      if (ratio > 1.5) {
+        baseMargin = Math.round(height * 0.22);
+      } else {
+        baseMargin = Math.round(height * 0.18);
+      }
+    }
+    style.marginV = baseMargin + Math.round(randRange(-6, 6));
     if (style.position === "custom") {
       style.posX = style.posX + randRange(-0.01, 0.01);
       style.posY = style.posY + randRange(-0.01, 0.01);

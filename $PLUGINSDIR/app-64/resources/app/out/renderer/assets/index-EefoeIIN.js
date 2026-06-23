@@ -13553,6 +13553,80 @@ function PreviewPanel() {
                   }
                 }
               ),
+              exp.showSafeAreas && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { 
+                style: { position: "absolute", inset: 0, pointerEvents: "none", zIndex: 10 }, 
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { position: "absolute", inset: "5%", border: "1px dashed rgba(255,255,255,0.45)", borderRadius: 4 } }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { position: "absolute", inset: "10%", border: "1px dashed rgba(255,80,80,0.55)", borderRadius: 4 } }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { position: "absolute", left: "10%", right: "10%", bottom: H2 > W2 ? "28%" : "15%", borderTop: "1px dotted rgba(80,255,80,0.65)" } })
+                ]
+              }),
+              exp.showDeviceMockup && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { 
+                style: { position: "absolute", inset: 0, pointerEvents: "none", zIndex: 11, fontFamily: "sans-serif", color: "#ffffff" }, 
+                children: 
+                  (exp.platformPreset === "tiktok_reels_shorts" || exp.platformPreset === "story") ? (
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", inset: 0 }, children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", top: 15, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 16, fontSize: 14, fontWeight: 600, textShadow: "1px 1px 2px rgba(0,0,0,0.8)" }, children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { opacity: 0.6 }, children: "Following" }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "For You" })
+                      ] }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", right: 10, bottom: "25%", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }, children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { width: 36, height: 36, borderRadius: "50%", background: "#444", border: "1px solid #fff" } }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" }, children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 20 }, children: "♥" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 10, fontWeight: 600 }, children: "124K" })
+                        ] }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" }, children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 20 }, children: "💬" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 10, fontWeight: 600 }, children: "782" })
+                        ] }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", alignItems: "center" }, children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 20 }, children: "➥" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 10, fontWeight: 600 }, children: "Share" })
+                        ] })
+                      ] }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", left: 12, bottom: 15, right: 60, display: "flex", flexDirection: "column", gap: 4, textShadow: "1px 1px 2px rgba(0,0,0,0.8)" }, children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontWeight: 600, fontSize: 13 }, children: "@masjavas_pro" }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 11, opacity: 0.9 }, children: "Amazing social media video auto-resize #visualizer #autoFix" }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 10, opacity: 0.7 }, children: "🎵 original sound - masjavas" })
+                      ] })
+                    ] })
+                  ) : (exp.platformPreset === "instagram_feed_square" || exp.platformPreset === "instagram_feed_portrait") ? (
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", inset: 0 }, children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", top: 10, left: 10, right: 10, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, fontWeight: 600 }, children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 6 }, children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { width: 24, height: 24, borderRadius: "50%", background: "#444" } }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "masjavas_pro" })
+                        ] }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 16 }, children: "•••" })
+                      ] }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", left: 10, bottom: 10, right: 10, display: "flex", flexDirection: "column", gap: 4, fontSize: 11 }, children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 12, fontSize: 16, marginBottom: 4 }, children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "♡" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "💬" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "✈" })
+                        ] }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: "masjavas_pro " }),
+                          "Smart social media video resizing made extremely simple!"
+                        ] })
+                      ] })
+                    ] })
+                  ) : exp.platformPreset === "youtube_landscape" ? (
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", inset: 0 }, children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, height: 36, background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)", padding: "0 10px", display: "flex", alignItems: "center", gap: 10, fontSize: 12 }, children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { flex: 1, height: 3, background: "rgba(255,255,255,0.3)", position: "relative" }, children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { position: "absolute", left: 0, top: 0, bottom: 0, width: "35%", background: "#ff0000" } }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { position: "absolute", left: "35%", top: -3, width: 9, height: 9, borderRadius: "50%", background: "#ff0000" } })
+                        ] }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 12, fontSize: 14 }, children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "⚙" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "⛶" })
+                        ] })
+                      ] })
+                    ] })
+                  ) : null
+              }),
               /* @__PURE__ */ jsxRuntimeExports.jsx(
                 "div",
                 {
@@ -13994,7 +14068,17 @@ function drawLyrics(ctx, project, t2, W2, H2, nowMs = 0) {
     else if (nextIdx === 0) activeIdx = 0;
   }
   if (activeIdx === -1) return;
-  const baseY = style.position === "custom" ? H2 * style.posY : style.position === "top" ? H2 * 0.18 : style.position === "center" ? H2 / 2 : H2 * 0.82;
+  let baseY = style.position === "custom" ? H2 * style.posY : style.position === "top" ? H2 * 0.18 : style.position === "center" ? H2 / 2 : H2 * 0.82;
+  if (style.position === "bottom" && H2 > W2) {
+    const ratio = H2 / W2;
+    if (ratio > 1.5) {
+      baseY = H2 * 0.72;
+    } else {
+      baseY = H2 * 0.76;
+    }
+  } else if (style.position === "top" && H2 > W2) {
+    baseY = H2 * 0.20;
+  }
   const x2 = textX(style, W2);
   const scH = H2 / 1080;
   const lineStep = style.fontSize * 1.4 * scH;
@@ -14233,7 +14317,6 @@ function RenderPanel() {
     }
     const sep = outDir.includes("/") && !outDir.includes("\\") ? "/" : "\\";
     const a = project.audio;
-    const count = exp.batchRender ? Math.max(1, Math.floor(exp.batchCount ?? 1)) : 1;
     const safeName = sanitizeFilename(project.projectName || project.name || "mix");
     const runId = Date.now();
     const pad = (n2) => String(n2).padStart(2, "0");
@@ -14251,14 +14334,49 @@ function RenderPanel() {
       usedThisRun.push(path);
       return [path];
     };
-    const jobs = Array.from({ length: count }, (_, i) => ({
-      jobId: `batch-${runId}-${i}`,
-      project,
-      audioPath: a.items[0]?.path ?? "",
-      // ignored by merge (main re-picks/merges); empty for ASMR-only
-      footageOrder: singlePick ? drawUnusedFootage() : pickFootageOrder(project),
-      outputPath: count > 1 ? `${outDir}${sep}${safeName}_${pad(i + 1)}.mp4` : `${outDir}${sep}${safeName}.mp4`
-    }));
+
+    const selectedPlatforms = exp.multiExport && exp.multiExport.length > 0
+      ? exp.multiExport
+      : [exp.platformPreset || "youtube_landscape"];
+
+    const jobs = [];
+    const suffixMap = {
+      youtube_landscape: "_youtube",
+      tiktok_reels_shorts: "_tiktok",
+      instagram_feed_square: "_ig_feed",
+      instagram_feed_portrait: "_ig_portrait",
+      story: "_story",
+      facebook_feed: "_facebook_feed"
+    };
+
+    for (const platform of selectedPlatforms) {
+      const clonedProject = JSON.parse(JSON.stringify(project));
+      clonedProject.export.platformPreset = platform;
+      if (platform === "youtube_landscape") {
+        applyResolution(clonedProject.export, 1080, "16:9");
+      } else if (platform === "tiktok_reels_shorts" || platform === "story") {
+        applyResolution(clonedProject.export, 1920, "9:16");
+      } else if (platform === "instagram_feed_square" || platform === "facebook_feed") {
+        applyResolution(clonedProject.export, 1080, "1:1");
+      } else if (platform === "instagram_feed_portrait") {
+        applyResolution(clonedProject.export, 1350, "4:5");
+      }
+
+      const suffix = suffixMap[platform] || `_${platform}`;
+      const count = exp.batchRender ? Math.max(1, Math.floor(exp.batchCount ?? 1)) : 1;
+
+      for (let i = 0; i < count; i++) {
+        const platformName = count > 1 ? `${safeName}${suffix}_${pad(i + 1)}.mp4` : `${safeName}${suffix}.mp4`;
+        jobs.push({
+          jobId: `batch-${runId}-${platform}-${i}`,
+          project: clonedProject,
+          audioPath: a.items[0]?.path ?? "",
+          footageOrder: singlePick ? drawUnusedFootage() : pickFootageOrder(clonedProject),
+          outputPath: `${outDir}${sep}${platformName}`
+        });
+      }
+    }
+
     if (singlePick) patchProject((p2) => (p2.footage.used = usedThisRun, p2));
     return jobs;
   };
@@ -14288,6 +14406,11 @@ function RenderPanel() {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid2", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Format Video" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Toggle, { 
+          label: "Mode Pemula (Sederhana)", 
+          value: exp.beginnerMode ?? true, 
+          onChange: (v2) => patchProject((p2) => (p2.export.beginnerMode = v2, p2)) 
+        }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Preset Platform", value: exp.platformPreset || "youtube_landscape", options: [
           { value: "youtube_landscape", label: "YouTube Landscape (16:9)" },
           { value: "tiktok_reels_shorts", label: "TikTok / Reels / Shorts (9:16)" },
@@ -14309,81 +14432,124 @@ function RenderPanel() {
           }
           return p2;
         }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Rasio layar", value: exp.aspect, options: [
-          { value: "16:9", label: "16:9 (Landscape)" },
-          { value: "9:16", label: "9:16 (Vertikal)" },
-          { value: "1:1", label: "1:1 (Kotak)" },
-          { value: "4:5", label: "4:5 (Instagram)" },
-          { value: "custom", label: "Kustom (Manual)" }
-        ], onChange: (v2) => patchProject((p2) => {
-          if (v2 !== "custom") {
-            applyResolution(p2.export, p2.export.height, v2);
-          } else {
-            p2.export.aspect = "custom";
-          }
-          return p2;
-        }) }),
-        exp.aspect === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsx(Field, { label: "Lebar (Width)", children: 
-          /* @__PURE__ */ jsxRuntimeExports.jsx("input", {
-            type: "number",
-            className: "inp",
-            value: exp.width || 1920,
-            onChange: (e) => patchProject((p2) => {
-              const val = parseInt(e.target.value) || 1920;
-              p2.export.width = Math.round(val / 2) * 2;
-              return p2;
-            })
-          })
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Toggle, { 
+          label: "Tampilkan Safe Area", 
+          value: exp.showSafeAreas ?? false, 
+          onChange: (v2) => patchProject((p2) => (p2.export.showSafeAreas = v2, p2)) 
         }),
-        exp.aspect === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsx(Field, { label: "Tinggi (Height)", children: 
-          /* @__PURE__ */ jsxRuntimeExports.jsx("input", {
-            type: "number",
-            className: "inp",
-            value: exp.height || 1080,
-            onChange: (e) => patchProject((p2) => {
-              const val = parseInt(e.target.value) || 1080;
-              p2.export.height = Math.round(val / 2) * 2;
-              return p2;
-            })
-          })
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Toggle, { 
+          label: "Simulasikan Tampilan Aplikasi", 
+          value: exp.showDeviceMockup ?? false, 
+          onChange: (v2) => patchProject((p2) => (p2.export.showDeviceMockup = v2, p2)) 
         }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Resolusi Preset", value: String(exp.height), options: [
-          { value: "720", label: "720p — HD" },
-          { value: "1080", label: "1080p — Full HD" },
-          { value: "1440", label: "1440p — 2K" },
-          { value: "2160", label: "4K — Ultra HD" }
-        ], onChange: (v2) => patchProject((p2) => {
-          const h = parseInt(v2);
-          if (p2.export.aspect !== "custom") {
-            applyResolution(p2.export, h, p2.export.aspect);
-          } else {
-            p2.export.height = h;
-          }
-          return p2;
-        }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Frame rate", value: String(exp.fps), options: [
-          { value: "24", label: "24 fps — sinematik" },
-          { value: "30", label: "30 fps — standar" },
-          { value: "60", label: "60 fps — halus" }
-        ], onChange: (v2) => patchProject((p2) => (p2.export.fps = parseInt(v2), p2)) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Penyesuaian Visual", value: exp.resizeMode || "smartAutoFix", options: [
-          { value: "smartAutoFix", label: "Smart Auto-Fix (Rekomendasi)" },
-          { value: "fit", label: "Fit (Borders/Padding)" },
-          { value: "fill", label: "Fill (Penuh/Potong)" },
-          { value: "crop", label: "Crop Manual (Zoom/Geser)" },
-          { value: "blurBackground", label: "Blur Background" }
-        ], onChange: (v2) => patchProject((p2) => (p2.export.resizeMode = v2, p2)) }),
-        (exp.resizeMode === "fit" || exp.resizeMode === "blurBackground" || exp.resizeMode === "smartAutoFix") && 
-          /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Tipe Background", value: exp.backgroundMode || "blur", options: [
-            { value: "blur", label: "Blur footage" },
-            { value: "color", label: "Warna solid" }
-          ], onChange: (v2) => patchProject((p2) => (p2.export.backgroundMode = v2, p2)) }),
-        (exp.resizeMode === "fit" || exp.resizeMode === "blurBackground" || exp.resizeMode === "smartAutoFix") && exp.backgroundMode === "color" &&
-          /* @__PURE__ */ jsxRuntimeExports.jsx(ColorInput, { label: "Warna Background", value: exp.backgroundColor || "#000000", onChange: (v2) => patchProject((p2) => (p2.export.backgroundColor = v2, p2)) }),
-        (exp.resizeMode === "crop" || exp.resizeMode === "smartAutoFix") && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Zoom Scale", min: 1, max: 3, step: 0.05, value: exp.zoom ?? 1, onChange: (v2) => patchProject((p2) => (p2.export.zoom = v2, p2)) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Posisi Crop X (Horizontal)", min: 0, max: 1, step: 0.05, value: exp.cropX ?? 0.5, onChange: (v2) => patchProject((p2) => (p2.export.cropX = v2, p2)) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Posisi Crop Y (Vertikal)", min: 0, max: 1, step: 0.05, value: exp.cropY ?? 0.5, onChange: (v2) => patchProject((p2) => (p2.export.cropY = v2, p2)) })
+        (exp.beginnerMode ?? true) ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: 10, border: "1px solid var(--border)", borderRadius: 6, padding: 10, background: "var(--bg-dark)" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--text-dim)", display: "block", marginBottom: 6 }, children: "Ekspor Banyak Platform Sekaligus (Render Once, Export Many)" }),
+          [
+            { value: "youtube_landscape", label: "YouTube (16:9)" },
+            { value: "tiktok_reels_shorts", label: "TikTok / Reels (9:16)" },
+            { value: "instagram_feed_square", label: "Instagram Feed (1:1)" },
+            { value: "instagram_feed_portrait", label: "Instagram Portrait (4:5)" },
+            { value: "story", label: "Story (9:16)" },
+            { value: "facebook_feed", label: "Facebook Feed (1:1)" }
+          ].map((opt) => {
+            const isChecked = (exp.multiExport || []).includes(opt.value);
+            return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { 
+              style: { display: "flex", alignItems: "center", gap: 8, margin: "4px 0", fontSize: 12, cursor: "pointer" }, 
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("input", { 
+                  type: "checkbox", 
+                  checked: isChecked, 
+                  onChange: (e) => patchProject((p2) => {
+                    const list = p2.export.multiExport || [];
+                    if (e.target.checked) {
+                      if (!list.includes(opt.value)) p2.export.multiExport = [...list, opt.value];
+                    } else {
+                      p2.export.multiExport = list.filter((v3) => v3 !== opt.value);
+                    }
+                    return p2;
+                  }) 
+                }),
+                opt.label
+              ] 
+            }, opt.value);
+          })
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Rasio layar", value: exp.aspect, options: [
+            { value: "16:9", label: "16:9 (Landscape)" },
+            { value: "9:16", label: "9:16 (Vertikal)" },
+            { value: "1:1", label: "1:1 (Kotak)" },
+            { value: "4:5", label: "4:5 (Instagram)" },
+            { value: "custom", label: "Kustom (Manual)" }
+          ], onChange: (v2) => patchProject((p2) => {
+            if (v2 !== "custom") {
+              applyResolution(p2.export, p2.export.height, v2);
+            } else {
+              p2.export.aspect = "custom";
+            }
+            return p2;
+          }) }),
+          exp.aspect === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsx(Field, { label: "Lebar (Width)", children: 
+            /* @__PURE__ */ jsxRuntimeExports.jsx("input", {
+              type: "number",
+              className: "inp",
+              value: exp.width || 1920,
+              onChange: (e) => patchProject((p2) => {
+                const val = parseInt(e.target.value) || 1920;
+                p2.export.width = Math.round(val / 2) * 2;
+                return p2;
+              })
+            })
+          }),
+          exp.aspect === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsx(Field, { label: "Tinggi (Height)", children: 
+            /* @__PURE__ */ jsxRuntimeExports.jsx("input", {
+              type: "number",
+              className: "inp",
+              value: exp.height || 1080,
+              onChange: (e) => patchProject((p2) => {
+                const val = parseInt(e.target.value) || 1080;
+                p2.export.height = Math.round(val / 2) * 2;
+                return p2;
+              })
+            })
+          }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Resolusi Preset", value: String(exp.height), options: [
+            { value: "720", label: "720p — HD" },
+            { value: "1080", label: "1080p — Full HD" },
+            { value: "1440", label: "1440p — 2K" },
+            { value: "2160", label: "4K — Ultra HD" }
+          ], onChange: (v2) => patchProject((p2) => {
+            const h = parseInt(v2);
+            if (p2.export.aspect !== "custom") {
+              applyResolution(p2.export, h, p2.export.aspect);
+            } else {
+              p2.export.height = h;
+            }
+            return p2;
+          }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Frame rate", value: String(exp.fps), options: [
+            { value: "24", label: "24 fps — sinematik" },
+            { value: "30", label: "30 fps — standar" },
+            { value: "60", label: "60 fps — halus" }
+          ], onChange: (v2) => patchProject((p2) => (p2.export.fps = parseInt(v2), p2)) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Penyesuaian Visual", value: exp.resizeMode || "smartAutoFix", options: [
+            { value: "smartAutoFix", label: "Smart Auto-Fix (Rekomendasi)" },
+            { value: "fit", label: "Fit (Borders/Padding)" },
+            { value: "fill", label: "Fill (Penuh/Potong)" },
+            { value: "crop", label: "Crop Manual (Zoom/Geser)" },
+            { value: "blurBackground", label: "Blur Background" }
+          ], onChange: (v2) => patchProject((p2) => (p2.export.resizeMode = v2, p2)) }),
+          (exp.resizeMode === "fit" || exp.resizeMode === "blurBackground" || exp.resizeMode === "smartAutoFix") && 
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Tipe Background", value: exp.backgroundMode || "blur", options: [
+              { value: "blur", label: "Blur footage" },
+              { value: "color", label: "Warna solid" }
+            ], onChange: (v2) => patchProject((p2) => (p2.export.backgroundMode = v2, p2)) }),
+          (exp.resizeMode === "fit" || exp.resizeMode === "blurBackground" || exp.resizeMode === "smartAutoFix") && exp.backgroundMode === "color" &&
+            /* @__PURE__ */ jsxRuntimeExports.jsx(ColorInput, { label: "Warna Background", value: exp.backgroundColor || "#000000", onChange: (v2) => patchProject((p2) => (p2.export.backgroundColor = v2, p2)) }),
+          (exp.resizeMode === "crop" || exp.resizeMode === "smartAutoFix") && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Zoom Scale", min: 1, max: 3, step: 0.05, value: exp.zoom ?? 1, onChange: (v2) => patchProject((p2) => (p2.export.zoom = v2, p2)) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Posisi Crop X (Horizontal)", min: 0, max: 1, step: 0.05, value: exp.cropX ?? 0.5, onChange: (v2) => patchProject((p2) => (p2.export.cropX = v2, p2)) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Posisi Crop Y (Vertikal)", min: 0, max: 1, step: 0.05, value: exp.cropY ?? 0.5, onChange: (v2) => patchProject((p2) => (p2.export.cropY = v2, p2)) })
+          ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { marginTop: 10, width: "100%" }, onClick: () => patchProject((p2) => {
           p2.export.platformPreset = "youtube_landscape";
@@ -14396,6 +14562,10 @@ function RenderPanel() {
           p2.export.cropY = 0.5;
           p2.export.backgroundMode = "blur";
           p2.export.backgroundColor = "#000000";
+          p2.export.beginnerMode = true;
+          p2.export.showSafeAreas = false;
+          p2.export.showDeviceMockup = false;
+          p2.export.multiExport = [];
           return p2;
         }), children: "Reset ke Rekomendasi Otomatis" }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "soon", children: [
