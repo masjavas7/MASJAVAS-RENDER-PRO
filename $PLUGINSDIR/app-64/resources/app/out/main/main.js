@@ -546,7 +546,9 @@ class SidecarService {
     return { count: res.frames || 0, bands: res.bands || bands };
   }
   async transcribe(path, model = "small", language) {
-    return await this.call("transcribe", { path, model, language }, 6e5);
+    return await transcribeWithChunking(path, async (chunkPath) => {
+      return await this.call("transcribe", { path: chunkPath, model, language }, 6e5);
+    });
   }
   async masterRender(path, out, preset, targetLufs, outputGain, fadeIn = 0, fadeOut = 0) {
     return await this.call("master_render", { path, out, preset, targetLufs, outputGain, fadeIn, fadeOut }, 3e5);
@@ -717,6 +719,10 @@ class ProjectService {
       showPlaylist: mode === "playlist",
       spectrumMode: mode === "lyrics" || mode === "playlist" ? "reactive" : "static",
       filePath: null,
+      introVideoPath: null,
+      outroVideoPath: null,
+      introAudioEnabled: false,
+      outroAudioEnabled: false,
       createdAt: now,
       updatedAt: now,
       footage: {
@@ -1106,6 +1112,137 @@ class ProbeService {
   }
 }
 const probeService = new ProbeService();
+
+async function sliceAudio(inputPath, outputPath, startSec, durationSec) {
+  const ffmpeg = await ffmpegService.resolvedPath();
+  if (!ffmpeg) throw new Error("ffmpeg not found for slicing");
+  const args = [
+    "-y",
+    "-ss", String(startSec),
+    "-t", String(durationSec),
+    "-i", inputPath,
+    "-c:a", "copy",
+    outputPath
+  ];
+  await pexec(ffmpeg, args, { windowsHide: true });
+}
+
+async function preprocessAudio(inputPath, outputPath) {
+  const ffmpeg = await ffmpegService.resolvedPath();
+  if (!ffmpeg) throw new Error("ffmpeg not found for preprocessing");
+  const args = [
+    "-y",
+    "-i", inputPath,
+    "-vn",
+    "-ac", "1",
+    "-ar", "16000",
+    "-b:a", "64k",
+    outputPath
+  ];
+  await pexec(ffmpeg, args, { windowsHide: true });
+}
+
+async function transcribeWithChunking(audioPath, transcribeFn) {
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const fs = await import("node:fs/promises");
+  
+  const tempDir = os.tmpdir();
+  const preprocessedPath = path.join(tempDir, `masjavas_prep_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.mp3`);
+  
+  try {
+    writeLog("render.log", `Preprocessing audio file: ${audioPath}`);
+    await preprocessAudio(audioPath, preprocessedPath);
+    
+    const probe = await probeService.probe(preprocessedPath);
+    const duration = probe.duration || 0;
+    const stat = await fs.stat(preprocessedPath);
+    const sizeMb = stat.size / 1024 / 1024;
+    
+    const chunkDurationSec = 180;
+    const overlapSec = 2;
+    const stride = chunkDurationSec - overlapSec;
+    
+    if (sizeMb <= 20 && duration <= chunkDurationSec) {
+      writeLog("render.log", `Audio duration ${duration.toFixed(1)}s (Size: ${sizeMb.toFixed(1)}MB) is within direct limit. Transcribing directly...`);
+      return await transcribeFn(preprocessedPath);
+    }
+    
+    writeLog("render.log", `Audio duration ${duration.toFixed(1)}s (Size: ${sizeMb.toFixed(1)}MB) exceeds limit. Slicing into 3-minute chunks with 2s overlap...`);
+    
+    let chunksCount = 1;
+    if (duration > chunkDurationSec) {
+      chunksCount = Math.ceil((duration - overlapSec) / stride);
+    }
+    
+    const mergedLines = [];
+    let detectedLanguage = null;
+    let engineName = "";
+    let modelName = "";
+    
+    for (let i = 0; i < chunksCount; i++) {
+      const startSec = i * stride;
+      const chunkDur = Math.min(chunkDurationSec, duration - startSec);
+      
+      const chunkPath = path.join(tempDir, `masjavas_chunk_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}.mp3`);
+      
+      try {
+        await sliceAudio(preprocessedPath, chunkPath, startSec, chunkDur);
+        writeLog("render.log", `Transcribing chunk ${i + 1}/${chunksCount} [${startSec}s - ${startSec + chunkDur}s]...`);
+        const res = await transcribeFn(chunkPath);
+        
+        if (res && Array.isArray(res.lines)) {
+          engineName = res.engine || engineName;
+          modelName = res.model || modelName;
+          detectedLanguage = res.language || detectedLanguage;
+          
+          const shiftedLines = res.lines.map(line => {
+            const shiftedLine = {
+              ...line,
+              t: line.t >= 0 ? line.t + startSec : -1,
+              end: line.end >= 0 ? line.end + startSec : -1,
+            };
+            if (Array.isArray(line.words)) {
+              shiftedLine.words = line.words.map(w => ({
+                ...w,
+                t: w.t >= 0 ? w.t + startSec : -1,
+                end: w.end >= 0 ? w.end + startSec : -1
+              }));
+            }
+            return shiftedLine;
+          });
+          
+          const startBoundary = i === 0 ? 0 : startSec + (overlapSec / 2);
+          const endBoundary = i === chunksCount - 1 ? Infinity : (startSec + chunkDur) - (overlapSec / 2);
+          
+          const filteredLines = shiftedLines.filter(line => {
+            if (line.t < 0) return true;
+            return line.t >= startBoundary && line.t < endBoundary;
+          });
+          
+          mergedLines.push(...filteredLines);
+        }
+      } catch (err) {
+        writeLog("render.log", `Error transcribing chunk ${i + 1}: ${err.message}`);
+        throw err;
+      } finally {
+        fs.unlink(chunkPath).catch(() => {});
+      }
+    }
+    
+    writeLog("render.log", `Transcription complete. Merged ${mergedLines.length} lines from ${chunksCount} chunks.`);
+    
+    return {
+      lines: mergedLines,
+      engine: engineName,
+      model: modelName,
+      language: detectedLanguage
+    };
+  } finally {
+    fs.unlink(preprocessedPath).catch(() => {});
+  }
+}
+
 function parseLrc(text) {
   const lines = [];
   const re = /\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
@@ -1167,7 +1304,7 @@ function cleanLyricText(s) {
 function normalizeLyrics(input, audioDuration) {
   let rawLines = [];
   if (!input) {
-    return { enabled: true, showLyrics: true, lines: [] };
+    return { enabled: true, showLyrics: true, lines: [], lyrics: [] };
   }
   if (typeof input === "string") {
     if (input.includes("[") && input.includes("]")) {
@@ -1222,9 +1359,31 @@ function normalizeLyrics(input, audioDuration) {
       words
     };
   }).filter(Boolean);
+
   const dur = typeof audioDuration === "number" && audioDuration > 0 ? audioDuration : (lines.length * 4 || 15);
   const hasNoTimings = lines.every(l => l.t < 0);
+
   if (hasNoTimings) {
+    const minLines = Math.max(3, Math.ceil(dur / 4));
+    const allWords = lines.flatMap(l => (l.text || "").split(/\s+/)).map(w => w.trim()).filter(Boolean);
+    
+    if (allWords.length > 0) {
+      const idealWordsPerLine = Math.floor(allWords.length / minLines);
+      const targetWordsPerLine = Math.max(1, Math.min(8, idealWordsPerLine));
+      
+      const newLines = [];
+      for (let i = 0; i < allWords.length; i += targetWordsPerLine) {
+        const chunk = allWords.slice(i, i + targetWordsPerLine);
+        newLines.push({
+          id: `line-chunk-${Math.random().toString(36).slice(2, 6)}`,
+          text: chunk.join(" "),
+          t: -1,
+          end: -1
+        });
+      }
+      lines = newLines;
+    }
+    
     const perLine = dur / Math.max(1, lines.length);
     lines = lines.map((l, i) => {
       const startT = i * perLine;
@@ -1238,7 +1397,13 @@ function normalizeLyrics(input, audioDuration) {
           end: startT + (wi + 1) * perWord
         }));
       }
-      return { ...l, t: startT, end: endT, words };
+      return {
+        id: l.id || `line-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        text: l.text,
+        t: startT,
+        end: endT,
+        words
+      };
     });
   } else {
     lines.sort((a, b) => a.t - b.t);
@@ -1263,7 +1428,15 @@ function normalizeLyrics(input, audioDuration) {
     }
   }
   lines.sort((a, b) => a.t - b.t);
-  return { enabled: true, showLyrics: true, lines };
+  return {
+    enabled: true,
+    showLyrics: true,
+    lines,
+    lyrics: lines,
+    style: input?.style,
+    highlightColor: input?.highlightColor,
+    animation: input?.animation
+  };
 }
 const GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const MODEL = "whisper-large-v3-turbo";
@@ -1271,41 +1444,43 @@ const MAX_BYTES = 25 * 1024 * 1024;
 class GroqService {
   async transcribe(path, language, apiKey) {
     if (!apiKey) throw new Error("Groq API key belum diatur. Masukkan API key di Pengaturan → Groq AI.");
-    const stat = await node_fs.promises.stat(path);
-    if (stat.size > MAX_BYTES) {
-      throw new Error(
-        `File audio terlalu besar untuk Groq (${(stat.size / 1024 / 1024).toFixed(1)} MB > 25 MB). Gunakan WhisperX lokal atau kompres audio terlebih dahulu.`
-      );
-    }
-    const form = new FormData();
-    const fileBlob = await fileToBlob(path);
-    form.append("file", fileBlob, node_path.basename(path));
-    form.append("model", MODEL);
-    form.append("response_format", "verbose_json");
-    form.append("timestamp_granularities[]", "word");
-    if (language && language !== "auto") form.append("language", language);
-    const resp = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form
-    });
-    if (!resp.ok) {
-      let msg = `Groq API error ${resp.status}`;
-      try {
-        const body = await resp.json();
-        if (body?.error?.message) msg = `Groq: ${body.error.message}`;
-      } catch {
+    return await transcribeWithChunking(path, async (chunkPath) => {
+      const stat = await node_fs.promises.stat(chunkPath);
+      if (stat.size > MAX_BYTES) {
+        throw new Error(
+          `Chunk audio terlalu besar untuk Groq (${(stat.size / 1024 / 1024).toFixed(1)} MB > 25 MB).`
+        );
       }
-      throw new Error(msg);
-    }
-    const data = await resp.json();
-    const lines = groqResponseToLines(data);
-    return {
-      lines,
-      engine: "groq",
-      model: MODEL,
-      language: data.language ?? null
-    };
+      const form = new FormData();
+      const fileBlob = await fileToBlob(chunkPath);
+      form.append("file", fileBlob, node_path.basename(chunkPath));
+      form.append("model", MODEL);
+      form.append("response_format", "verbose_json");
+      form.append("timestamp_granularities[]", "word");
+      if (language && language !== "auto") form.append("language", language);
+      const resp = await fetch(GROQ_API_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form
+      });
+      if (!resp.ok) {
+        let msg = `Groq API error ${resp.status}`;
+        try {
+          const body = await resp.json();
+          if (body?.error?.message) msg = `Groq: ${body.error.message}`;
+        } catch {
+        }
+        throw new Error(msg);
+      }
+      const data = await resp.json();
+      const lines = groqResponseToLines(data);
+      return {
+        lines,
+        engine: "groq",
+        model: MODEL,
+        language: data.language ?? null
+      };
+    });
   }
   /** Transcribe multiple audio paths in parallel. Returns settled results. */
   async transcribeMany(paths, language, apiKey) {
@@ -1342,12 +1517,28 @@ function groqResponseToLines(data) {
   if (words.length > 0) {
     return groupWordsToLines(words);
   }
-  return (data.segments ?? []).map((seg) => ({
+  const segs = (data.segments ?? []).map((seg) => ({
     t: seg.start,
     end: seg.end,
     text: cleanLyricText(seg.text),
     words: []
   })).filter((l) => l.text.length > 0);
+
+  if (segs.length > 0) {
+    return segs;
+  }
+
+  // Fallback if we only have data.text
+  if (data.text) {
+    return [{
+      t: -1,
+      end: -1,
+      text: cleanLyricText(data.text),
+      words: []
+    }];
+  }
+
+  return [];
 }
 function groupWordsToLines(words) {
   const GAP = 0.3;
@@ -2058,7 +2249,7 @@ function header(width, height, style, fontScale = 1) {
   const align = alignment(style);
   const outline = Math.max(0, style.strokeWidth) * fontScale;
   const shadow = (style.shadow ? 3 : 0) * fontScale;
-  const marginV = Math.round(height * 0.1);
+  const marginV = style.marginV !== undefined ? style.marginV : Math.round(height * 0.1);
   const family = resolveFamily(style.fontFamily);
   const fontSize = Math.round(style.fontSize * fontScale);
   return `[Script Info]
@@ -2080,8 +2271,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 function escapeText(s) {
   return s.replace(/\\/g, "⧵").replace(/\n/g, "\\N").replace(/[{}]/g, "");
 }
-function buildLyricsAss(cfg, width, height, duration = 0) {
-  const style = cfg.style;
+function buildLyricsAss(cfg, width, height, duration = 0, dna = "") {
+  writeLog("render.log", `Generating ASS subtitle file. Lines count: ${cfg?.lines?.length || 0}`);
+  const style = { ...cfg.style };
+  let prng = null;
+  if (dna) {
+    prng = createPrng(dna);
+  }
+  const randRange = (min, max) => {
+    if (!prng) return (min + max) / 2;
+    return min + prng() * (max - min);
+  };
+  if (prng) {
+    style.fontSize = style.fontSize * randRange(0.96, 1.04);
+    style.strokeWidth = style.strokeWidth * randRange(0.90, 1.10);
+    style.marginV = Math.round(height * 0.1) + Math.round(randRange(-6, 6));
+    if (style.position === "custom") {
+      style.posX = style.posX + randRange(-0.01, 0.01);
+      style.posY = style.posY + randRange(-0.01, 0.01);
+    }
+  }
   let out = header(width, height, style, height / 1080);
   const hi = assColor(cfg.highlightColor);
   const base = assColor(style.color, style.opacity);
@@ -2092,14 +2301,38 @@ function buildLyricsAss(cfg, width, height, duration = 0) {
     const line = cfg.lines[i];
     const lineText = cleanLyricText(line.text);
     if (!lineText) continue;
-    const startT = line.t;
-    let endT = line.end > line.t ? line.end : cfg.lines[i + 1]?.t ?? (duration > startT ? duration : startT + 3);
+    let startJitter = 0;
+    let endJitter = 0;
+    if (prng) {
+      const startSign = prng() < 0.5 ? -1 : 1;
+      startJitter = startSign * (0.015 + prng() * 0.020);
+      const endSign = prng() < 0.5 ? -1 : 1;
+      endJitter = endSign * (0.015 + prng() * 0.020);
+    }
+    const origStart = line.t;
+    let origEnd = line.end > line.t ? line.end : cfg.lines[i + 1]?.t ?? (duration > origStart ? duration : origStart + 3);
+    if (duration > 0) origEnd = Math.min(origEnd, duration);
+    if (origEnd <= origStart) origEnd = origStart + 0.2;
+    const startT = Math.max(0, origStart + startJitter);
+    let endT = origEnd + endJitter;
     if (duration > 0) endT = Math.min(endT, duration);
     if (endT <= startT) endT = startT + 0.2;
     const start = ts(startT);
     const end = ts(endT);
     const dur = Math.max(0.2, endT - startT);
-    const cleanWords = (line.words ?? []).map((w) => ({ t: w.t, end: w.end, text: cleanLyricText(w.text) })).filter((w) => w.text);
+    const origDur = origEnd - origStart;
+    const scale = origDur > 0.01 ? dur / origDur : 1;
+    const cleanWords = (line.words ?? []).map((w) => {
+      const wText = cleanLyricText(w.text);
+      if (!wText) return null;
+      const relStart = w.t - origStart;
+      const relEnd = w.end - origStart;
+      return {
+        t: startT + relStart * scale,
+        end: startT + relEnd * scale,
+        text: wText
+      };
+    }).filter(Boolean);
     if (useWordMode && cleanWords.length > 0) {
       for (let wi = 0; wi < cleanWords.length; wi++) {
         const w = cleanWords[wi];
@@ -2209,9 +2442,17 @@ function hslShift(base, t) {
 async function createLogoDrawer(project, audioPath, duration, fps, W, H, baseSeconds, dummy = false) {
   const logo = project.logo;
   if (!logo.enabled || !logo.path) return null;
+  
+  const dna = project.dna || generateProjectDna(project);
+  const prng = createPrng(dna);
+  const randRange = (min, max) => min + prng() * (max - min);
+  
+  // Mutate bars count by +/- 10%
+  const mutatedBars = Math.max(8, Math.round(logo.bars * randRange(0.90, 1.10)));
+  
   const renderDur = Math.min(duration, Math.max(20, baseSeconds));
   const effectiveFps = fps;
-  const src = await loadFrameSource(audioPath, effectiveFps, logo.bars, renderDur);
+  const src = await loadFrameSource(audioPath, effectiveFps, mutatedBars, renderDur);
   if (!src.count) return null;
   const beats = dummy ? [] : await sidecarService.analyze(audioPath).then((a) => a.beats ?? []).catch(() => []);
   const useBeats = beats.length >= 4;
@@ -2221,7 +2462,7 @@ async function createLogoDrawer(project, audioPath, duration, fps, W, H, baseSec
   const cy = H * logo.posY;
   const logoR = minDim * logo.size / 2;
   const ringBase = minDim * logo.ringRadius;
-  const bars = logo.bars;
+  const bars = mutatedBars;
   const totalFrames = Math.min(src.count, Math.ceil(renderDur * effectiveFps));
   const doRotate = logo.rotate ?? false;
   const reqSecPerRev = Math.max(2, Math.min(20, logo.rotateSecPerRev ?? 8));
@@ -2238,6 +2479,24 @@ async function createLogoDrawer(project, audioPath, duration, fps, W, H, baseSec
   let bounce = 0;
   let beatIdx = 0;
   const dtNative = 30 / effectiveFps;
+  
+  // Modulate beat reaction physics
+  const decayFactor = Math.min(0.99, Math.max(0.1, 0.8 * randRange(0.96, 1.04)));
+  const bounceAmp = 0.18 * randRange(0.90, 1.10);
+  
+  // Modulate particle field physics
+  const particleCountMut = randRange(0.85, 1.15); // count +/- 15%
+  const particleSizeMut = randRange(0.85, 1.15);  // size +/- 15%
+  const particleSpeedMut = randRange(0.85, 1.15); // speed +/- 15%
+  
+  // Modulate visualizer ring properties
+  const ringThicknessMut = logo.ringThickness * randRange(0.85, 1.15);
+  const glowIntensityMut = logo.intensity * randRange(0.90, 1.10);
+  
+  // Modulate colors with HSL shifts (+/- 12 degrees)
+  const ringColorMut = shiftColorHue(logo.ringColor, randRange(-12, 12));
+  const particleColorMut = shiftColorHue(logo.particleColor ?? "#ffd24a", randRange(-12, 12));
+  
   const drawFrame = (ctx, f) => {
     const frame = ringFrames[Math.min(f, totalFrames - 1)];
     const energy = customText.bassEnergy(frame);
@@ -2256,24 +2515,51 @@ async function createLogoDrawer(project, audioPath, duration, fps, W, H, baseSec
     prevBass = energy;
     const bassBeat = beatHere && energy > 0.18;
     if (bassBeat) bounce = 1;
-    bounce *= Math.pow(0.8, dtNative);
-    const scale = doBounce ? 1 + bounce * 0.18 : doPulse ? 1 + energy * 0.12 : 1;
+    bounce *= Math.pow(decayFactor, dtNative);
+    const scale = doBounce ? 1 + bounce * bounceAmp : doPulse ? 1 + energy * 0.12 : 1;
     const effRadius = logoR * scale;
     if (doParticles) {
+      const oldPartsLen = pf.parts.length;
       customText.stepParticles(ctx, pf, {
         cx,
         cy,
-        minDim,
+        minDim: minDim * particleSizeMut,
         energy,
-        color: logo.particleColor ?? "#ffd24a",
+        color: particleColorMut,
         rgb: logo.particleRgb ?? false,
         t: f / effectiveFps,
         dt: dtNative,
         spawnRadius: effRadius,
         style: logo.particleStyle ?? "burst",
-        speed: logo.particleSpeed ?? 1,
+        speed: (logo.particleSpeed ?? 1) * particleSpeedMut / particleSizeMut,
         forceBurst: bassBeat
       });
+      const newPartsLen = pf.parts.length;
+      const addedCount = newPartsLen - oldPartsLen;
+      if (addedCount > 0 && particleCountMut !== 1) {
+        if (particleCountMut < 1) {
+          const keepCount = Math.round(addedCount * particleCountMut);
+          const removed = addedCount - keepCount;
+          if (removed > 0) {
+            pf.parts.splice(oldPartsLen + keepCount, removed);
+          }
+        } else {
+          const extraCount = Math.round(addedCount * (particleCountMut - 1));
+          for (let i = 0; i < extraCount; i++) {
+            const basePart = pf.parts[oldPartsLen + (i % addedCount)];
+            if (basePart) {
+              pf.parts.push({
+                ...basePart,
+                x: basePart.x + (prng() - 0.5) * 2,
+                y: basePart.y + (prng() - 0.5) * 2,
+                vx: basePart.vx * (0.9 + prng() * 0.2),
+                vy: basePart.vy * (0.9 + prng() * 0.2),
+                spin: basePart.spin + (prng() - 0.5) * 0.5
+              });
+            }
+          }
+        }
+      }
     }
     drawRing(ctx, frame, {
       cx,
@@ -2281,11 +2567,11 @@ async function createLogoDrawer(project, audioPath, duration, fps, W, H, baseSec
       ringBase,
       minDim,
       bars,
-      thickness: logo.ringThickness,
-      color: logo.ringColor,
+      thickness: ringThicknessMut,
+      color: ringColorMut,
       rgb: logo.rgb,
       glow: logo.glow,
-      intensity: logo.intensity,
+      intensity: glowIntensityMut,
       mode: logo.mode,
       style: logo.ringStyle ?? "bars",
       t: f / Math.max(1, totalFrames)
@@ -2916,7 +3202,14 @@ class RenderService {
     }
     this.isRendering = true;
     this.cancelled = false;
-    writeLog("render.log", `Starting render for project "${project.name}" with ${jobs.length} jobs.`);
+    
+    // Generate and register Project DNA
+    const { dna, saltCounter } = checkAndRegisterDna(project);
+    project.dna = dna;
+    this.currentDna = dna;
+    this.currentProjectName = project.name;
+    
+    writeLog("render.log", `Starting render for project "${project.name}" with ${jobs.length} jobs. Project DNA resolved to ${dna} (salt counter: ${saltCounter})`);
     
     // Disk space check: require at least 500MB free in userData directory
     try {
@@ -3320,6 +3613,8 @@ class RenderService {
     }
     } finally {
       this.isRendering = false;
+      this.currentDna = null;
+      this.currentProjectName = null;
     }
   }
   async buildArgs(project, job, duration, encoderId, quality, timeline, tmpDir, log, baseVideoPath = null, prerendered = [], phase = "single", baseWindow, audioMapPath) {
@@ -3436,6 +3731,37 @@ class RenderService {
       fc.push(`[_gdup]gblur=sigma=${sigma}[_gblur]`);
       fc.push(`[_gbase][_gblur]blend=all_mode=addition:all_opacity=${blendOpacity}[glowed]`);
       lastVideo = "[glowed]";
+    }
+    let introDur = 0;
+    let outroDur = 0;
+    let introIdx = -1;
+    let outroIdx = -1;
+    if (!isLoop) {
+      if (project.introVideoPath) {
+        introDur = await this.safeDur(project.introVideoPath).catch(() => 0);
+        if (introDur > 0) {
+          inputs.push("-i", project.introVideoPath);
+          introIdx = countInputs(inputs) - 1;
+        }
+      }
+      if (project.outroVideoPath) {
+        outroDur = await this.safeDur(project.outroVideoPath).catch(() => 0);
+        if (outroDur > 0) {
+          inputs.push("-i", project.outroVideoPath);
+          outroIdx = countInputs(inputs) - 1;
+        }
+      }
+    }
+    if (introIdx !== -1 && introDur > 0) {
+      fc.push(`[${introIdx}:v]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},setpts=PTS-STARTPTS,format=rgba[intro_v]`);
+      fc.push(`${lastVideo}[intro_v]overlay=0:0:enable='between(t,0,${introDur.toFixed(3)})':eof_action=pass[vintro]`);
+      lastVideo = "[vintro]";
+    }
+    if (outroIdx !== -1 && outroDur > 0) {
+      const startOutro = Math.max(0, duration - outroDur);
+      fc.push(`[${outroIdx}:v]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},setpts=PTS-STARTPTS+${startOutro.toFixed(3)}/TB,format=rgba[outro_v]`);
+      fc.push(`${lastVideo}[outro_v]overlay=0:0:enable='between(t,${startOutro.toFixed(3)},${duration.toFixed(3)})':eof_action=pass[voutro]`);
+      lastVideo = "[voutro]";
     }
     const doLogoRing = project.logo.enabled && !!project.logo.path;
     const playlistInPipe = !isLoop && showPlaylist(project) && (project.playlist?.items?.length ?? 0) > 0;
@@ -3632,7 +3958,7 @@ class RenderService {
     const subFiles = [];
     if (!isLoop && wantLyrics) {
       const normalized = normalizeLyrics(project.lyrics, duration);
-      await node_fs.promises.writeFile(node_path.join(tmpDir, "sub_l.ass"), "\uFEFF" + buildLyricsAss(normalized, W, H, duration), "utf-8");
+      await node_fs.promises.writeFile(node_path.join(tmpDir, "sub_l.ass"), "\uFEFF" + buildLyricsAss(normalized, W, H, duration, project.dna), "utf-8");
       subFiles.push("sub_l.ass");
     }
     if (subFiles.length) {
@@ -3726,15 +4052,35 @@ class RenderService {
     const fps = exp.fps;
     const hasLyrics = showLyrics(project) && project.lyrics.lines.length > 0;
     const hasPlaylist = showPlaylist(project) && project.playlist.items.length > 0;
-    const needBurn = hasLyrics || hasPlaylist;
+    const hasIntro = !!project.introVideoPath;
+    const hasOutro = !!project.outroVideoPath;
+    const needBurn = hasLyrics || hasPlaylist || hasIntro || hasOutro;
     const args = ["-hide_banner", "-y"];
     if (loop) args.push("-stream_loop", "-1");
     args.push("-i", loopPath);
     args.push("-i", audioMapPath ?? job.audioPath);
     const audioIdx = 1;
+    let introDur = 0;
+    let outroDur = 0;
+    let introIdx = -1;
+    let outroIdx = -1;
+    if (project.introVideoPath) {
+      introDur = await this.safeDur(project.introVideoPath).catch(() => 0);
+      if (introDur > 0) {
+        args.push("-i", project.introVideoPath);
+        introIdx = countInputs(args) - 1;
+      }
+    }
+    if (project.outroVideoPath) {
+      outroDur = await this.safeDur(project.outroVideoPath).catch(() => 0);
+      if (outroDur > 0) {
+        args.push("-i", project.outroVideoPath);
+        outroIdx = countInputs(args) - 1;
+      }
+    }
     const feed = void 0;
     const plPngs = hasPlaylist ? await prerenderPlaylistPngs(project, W, H, tmpDir) : null;
-    const playlistInputStart = 2;
+    const playlistInputStart = countInputs(args);
     const cleanup = async () => {
       try {
         await node_fs.promises.rm(tmpDir, { recursive: true, force: true });
@@ -3753,10 +4099,21 @@ class RenderService {
     }
     const fc = [];
     let lastVideo = "[0:v]";
+    if (introIdx !== -1 && introDur > 0) {
+      fc.push(`[${introIdx}:v]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},setpts=PTS-STARTPTS,format=rgba[intro_v]`);
+      fc.push(`${lastVideo}[intro_v]overlay=0:0:enable='between(t,0,${introDur.toFixed(3)})':eof_action=pass[vintro]`);
+      lastVideo = "[vintro]";
+    }
+    if (outroIdx !== -1 && outroDur > 0) {
+      const startOutro = Math.max(0, duration - outroDur);
+      fc.push(`[${outroIdx}:v]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},setpts=PTS-STARTPTS+${startOutro.toFixed(3)}/TB,format=rgba[outro_v]`);
+      fc.push(`${lastVideo}[outro_v]overlay=0:0:enable='between(t,${startOutro.toFixed(3)},${duration.toFixed(3)})':eof_action=pass[voutro]`);
+      lastVideo = "[voutro]";
+    }
     const subFiles = [];
     if (hasLyrics) {
       const normalized = normalizeLyrics(project.lyrics, duration);
-      await node_fs.promises.writeFile(node_path.join(tmpDir, "sub_l.ass"), "\uFEFF" + buildLyricsAss(normalized, W, H, duration), "utf-8");
+      await node_fs.promises.writeFile(node_path.join(tmpDir, "sub_l.ass"), "\uFEFF" + buildLyricsAss(normalized, W, H, duration, project.dna), "utf-8");
       subFiles.push("sub_l.ass");
     }
     if (subFiles.length) {
@@ -4180,7 +4537,23 @@ class RenderService {
     for (const fx of a.fx ?? []) {
       if (fx?.path) layers.push({ clip: fx.path, volume: clamp2(fx.volume), loop: fx.loop !== false });
     }
-    if (!layers.length && Math.abs(mainVol - 1) < 1e-3) return mainPath;
+    let introAudioPath = null;
+    let introDur = 0;
+    if (project.introVideoPath && project.introAudioEnabled) {
+      introDur = await this.safeDur(project.introVideoPath).catch(() => 0);
+      if (introDur > 0) {
+        introAudioPath = await this.extractAudio(project.introVideoPath, node_path.join(tmpDir, "intro_audio.wav"), ffmpeg);
+      }
+    }
+    let outroAudioPath = null;
+    let outroDur = 0;
+    if (project.outroVideoPath && project.outroAudioEnabled) {
+      outroDur = await this.safeDur(project.outroVideoPath).catch(() => 0);
+      if (outroDur > 0) {
+        outroAudioPath = await this.extractAudio(project.outroVideoPath, node_path.join(tmpDir, "outro_audio.wav"), ffmpeg);
+      }
+    }
+    if (!layers.length && !introAudioPath && !outroAudioPath && Math.abs(mainVol - 1) < 1e-3) return mainPath;
     const inputs = ["-i", mainPath];
     const fc = [`[0:a]volume=${mainVol.toFixed(3)},aformat=sample_rates=44100:channel_layouts=stereo[a0]`];
     const labels = ["[a0]"];
@@ -4190,6 +4563,19 @@ class RenderService {
       inputs.push("-i", ly.clip);
       fc.push(`[${idx}:a]volume=${ly.volume.toFixed(3)},aformat=sample_rates=44100:channel_layouts=stereo[a${idx}]`);
       labels.push(`[a${idx}]`);
+      idx++;
+    }
+    if (introAudioPath) {
+      inputs.push("-i", introAudioPath);
+      fc.push(`[${idx}:a]atrim=end=${introDur.toFixed(3)},volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo[aintro]`);
+      labels.push("[aintro]");
+      idx++;
+    }
+    if (outroAudioPath) {
+      inputs.push("-i", outroAudioPath);
+      const startOutroMs = Math.round(Math.max(0, duration - outroDur) * 1000);
+      fc.push(`[${idx}:a]atrim=end=${outroDur.toFixed(3)},adelay=${startOutroMs}|${startOutroMs},volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo[aoutro]`);
+      labels.push("[aoutro]");
       idx++;
     }
     fc.push(`${labels.join("")}amix=inputs=${idx}:duration=first:dropout_transition=0:normalize=0[mix]`);
@@ -4480,6 +4866,18 @@ class RenderService {
     });
   }
   runFfmpeg(ffmpeg, args, duration, onProgress, cwd, feed) {
+    if (this.currentDna && args.length > 1) {
+      const outIndex = args.length - 1;
+      const isVideoCompile = args.includes("-c:v") || args.includes("libx264") || args.includes("h264_qsv") || args.includes("h264_nvenc") || args.includes("h264_amf");
+      if (isVideoCompile) {
+        args.splice(outIndex, 0, 
+          "-metadata", `comment=MASJAVAS-DNA:${this.currentDna}`,
+          "-metadata", `title=${this.currentProjectName || "Proyek Video Musik"}`,
+          "-metadata", `artist=MASJAVAS RENDER PRO`,
+          "-metadata", `genre=Authenticity Engine v1.0`
+        );
+      }
+    }
     return new Promise((resolve, reject) => {
       const safeArgs = args.map(arg => arg.includes("gsk_") ? "gsk_****" : arg);
       const cmdStr = `ffmpeg ${safeArgs.join(" ")}`;
@@ -5196,4 +5594,131 @@ function compareVersions(v1, v2) {
     if (a < b) return -1;
   }
   return 0;
+}
+function generateProjectDna(project, salt = "") {
+  if (!project) return "00000000000000000000000000000000";
+  const crypto = require("crypto");
+  const audioPath = project.audio?.items?.[0]?.path || "";
+  const payload = `${project.id || ""}-${project.name || ""}-${project.created_at || ""}-${audioPath}-${salt}`;
+  return crypto.createHash("sha256").update(payload).digest("hex").substring(0, 32);
+}
+function createPrng(seedStr) {
+  let h = 2166136261;
+  for (let i = 0; i < seedStr.length; i++) {
+    h = Math.imul(h ^ seedStr.charCodeAt(i), 16777619);
+  }
+  let seed = h >>> 0;
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function checkAndRegisterDna(project) {
+  const fs = require("fs");
+  const path = require("path");
+  const dir = electron.app.getPath("userData");
+  const historyPath = path.join(dir, "history.json");
+  let history = [];
+  try {
+    if (fs.existsSync(historyPath)) {
+      history = JSON.parse(fs.readFileSync(historyPath, "utf8"));
+    }
+  } catch (e) {
+    writeLog("render.log", `Error loading DNA history: ${e.message}`);
+  }
+  let saltCounter = 0;
+  let dna = generateProjectDna(project, saltCounter === 0 ? "" : String(saltCounter));
+  const matchFound = (candidateDna) => {
+    return history.some(item => item.dna === candidateDna && item.projectId !== project.id);
+  };
+  while (matchFound(dna)) {
+    saltCounter++;
+    dna = generateProjectDna(project, String(saltCounter));
+  }
+  history.push({
+    projectId: project.id,
+    name: project.name,
+    dna,
+    timestamp: new Date().toISOString()
+  });
+  if (history.length > 100) history.shift();
+  try {
+    fs.writeFileSync(historyPath, JSON.stringify(history, null, 2), "utf8");
+  } catch (e) {
+    writeLog("render.log", `Error saving DNA history: ${e.message}`);
+  }
+  return { dna, saltCounter };
+}
+function shiftColorHue(colorStr, shift) {
+  if (!colorStr) return colorStr;
+  const str = colorStr.trim().toLowerCase();
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    if (max === min) {
+      h = s = 0;
+    } else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+  }
+  if (str.startsWith("hsl")) {
+    const parts = str.match(/[\d.]+/g);
+    if (parts && parts.length >= 3) {
+      let h = (parseFloat(parts[0]) + shift) % 360;
+      if (h < 0) h += 360;
+      const s = parts[1];
+      const l = parts[2];
+      const a = parts[3] !== undefined ? `, ${parts[3]}` : "";
+      return parts.length >= 4 ? `hsla(${Math.round(h)}, ${s}%, ${l}%, ${a})` : `hsl(${Math.round(h)}, ${s}%, ${l}%)`;
+    }
+  }
+  let r = 255, g = 255, b = 255, alpha = null;
+  if (str.startsWith("rgb")) {
+    const parts = str.match(/[\d.]+/g);
+    if (parts && parts.length >= 3) {
+      r = parseInt(parts[0], 10);
+      g = parseInt(parts[1], 10);
+      b = parseInt(parts[2], 10);
+      if (parts[3] !== undefined) alpha = parseFloat(parts[3]);
+    }
+  } else if (str.startsWith("#")) {
+    const hex = str.substring(1);
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else if (hex.length === 6 || hex.length === 8) {
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 4), 16);
+      b = parseInt(hex.substring(4, 6), 16);
+      if (hex.length === 8) alpha = parseInt(hex.substring(6, 8), 16) / 255;
+    }
+  } else {
+    if (str === "transparent") return colorStr;
+    const namedColors = {
+      red: [255,0,0], green: [0,128,0], blue: [0,0,255], yellow: [255,255,0],
+      orange: [255,165,0], purple: [128,0,128], pink: [255,192,203], cyan: [0,255,255],
+      magenta: [255,0,255], lime: [0,255,0], gold: [255,215,0]
+    };
+    if (namedColors[str]) {
+      [r, g, b] = namedColors[str];
+    } else {
+      return colorStr;
+    }
+  }
+  let [h, s, l] = rgbToHsl(r, g, b);
+  h = (h + shift) % 360;
+  if (h < 0) h += 360;
+  return alpha !== null ? `hsla(${h}, ${s}%, ${l}%, ${alpha})` : `hsl(${h}, ${s}%, ${l}%)`;
 }

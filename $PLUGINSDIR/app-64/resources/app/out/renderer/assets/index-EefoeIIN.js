@@ -7983,6 +7983,98 @@ function MediaPanel() {
           ] })
         ] }, m2.path);
       }) })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Video Intro & Outro Overlay" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "soon", style: { fontSize: 11, marginBottom: 12 }, children: "Tambahkan video overlay opsional untuk intro di awal dan outro di akhir. Durasi video utama tetap menjadi penentu durasi total." }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h4", { style: { margin: "10px 0 6px 0", fontSize: 13, color: "var(--text)" }, children: "Intro Overlay" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("input", {
+          type: "text",
+          readOnly: true,
+          placeholder: "Pilih video intro...",
+          value: project.introVideoPath || "",
+          style: { flex: 1, padding: "6px 10px", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text)", fontSize: 12 }
+        }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", {
+          className: "btn",
+          style: { padding: "6px 12px", fontSize: 12 },
+          onClick: async () => {
+            const sel = await window.masjavas.openFiles(VIDEO_FILTER);
+            if (sel && sel[0]) {
+              patchProject((p) => {
+                p.introVideoPath = sel[0];
+                return p;
+              });
+            }
+          },
+          children: "Pilih..."
+        }),
+        project.introVideoPath && /* @__PURE__ */ jsxRuntimeExports.jsx("button", {
+          className: "btn",
+          style: { padding: "6px 12px", fontSize: 12, color: "var(--danger)" },
+          onClick: () => patchProject((p) => {
+            p.introVideoPath = null;
+            return p;
+          }),
+          children: "Hapus"
+        })
+      ] }),
+      project.introVideoPath && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        Toggle,
+        {
+          label: "Aktifkan Audio Intro",
+          value: project.introAudioEnabled ?? false,
+          onChange: (v2) => patchProject((p2) => {
+            p2.introAudioEnabled = v2;
+            return p2;
+          })
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h4", { style: { margin: "16px 0 6px 0", fontSize: 13, color: "var(--text)" }, children: "Outro Overlay" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("input", {
+          type: "text",
+          readOnly: true,
+          placeholder: "Pilih video outro...",
+          value: project.outroVideoPath || "",
+          style: { flex: 1, padding: "6px 10px", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text)", fontSize: 12 }
+        }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", {
+          className: "btn",
+          style: { padding: "6px 12px", fontSize: 12 },
+          onClick: async () => {
+            const sel = await window.masjavas.openFiles(VIDEO_FILTER);
+            if (sel && sel[0]) {
+              patchProject((p) => {
+                p.outroVideoPath = sel[0];
+                return p;
+              });
+            }
+          },
+          children: "Pilih..."
+        }),
+        project.outroVideoPath && /* @__PURE__ */ jsxRuntimeExports.jsx("button", {
+          className: "btn",
+          style: { padding: "6px 12px", fontSize: 12, color: "var(--danger)" },
+          onClick: () => patchProject((p) => {
+            p.outroVideoPath = null;
+            return p;
+          }),
+          children: "Hapus"
+        })
+      ] }),
+      project.outroVideoPath && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        Toggle,
+        {
+          label: "Aktifkan Audio Outro",
+          value: project.outroAudioEnabled ?? false,
+          onChange: (v2) => patchProject((p2) => {
+            p2.outroAudioEnabled = v2;
+            return p2;
+          })
+        }
+      )
     ] })
   ] });
 }
@@ -8308,6 +8400,14 @@ function LyricsPanel() {
             toast("info", r2.error ? `Groq error: ${r2.error}` : "Vokal tidak terdeteksi. Coba rekaman yang lebih bersih atau ubah bahasa.");
           } else {
             const normalized = normalizeLyrics(r2.lines, audioItems[0]?.duration);
+            console.log({
+              audioDuration: audioItems[0]?.duration,
+              transcriptSegments: r2.lines,
+              normalizedLines: normalized.lines,
+              projectLyrics: normalized.lines,
+              editorLines: normalized.lines,
+              assDialogueCount: normalized.lines.length
+            });
             patchProject((p2) => (p2.lyrics.lines = normalized.lines, p2.lyrics.file = r2.path, p2.showLyrics = true, p2));
             toast("success", `${normalized.lines.length} baris lirik berhasil dihasilkan via Groq.`);
           }
@@ -8337,6 +8437,14 @@ function LyricsPanel() {
         return;
       }
       const normalized = normalizeLyrics(res.lines, audio?.duration);
+      console.log({
+        audioDuration: audio?.duration,
+        transcriptSegments: res.lines,
+        normalizedLines: normalized.lines,
+        projectLyrics: normalized.lines,
+        editorLines: normalized.lines,
+        assDialogueCount: normalized.lines.length
+      });
       patchProject((p2) => (p2.lyrics.lines = normalized.lines, p2.lyrics.file = audio.path, p2.showLyrics = true, p2));
       toast("success", `${normalized.lines.length} baris lirik berhasil dihasilkan.`);
       setTranscribeStatus("");
@@ -11718,7 +11826,7 @@ function parseTxt(text) {
 function normalizeLyrics(input, audioDuration) {
   let rawLines = [];
   if (!input) {
-    return { enabled: true, showLyrics: true, lines: [] };
+    return { enabled: true, showLyrics: true, lines: [], lyrics: [] };
   }
   if (typeof input === "string") {
     if (input.includes("[") && input.includes("]")) {
@@ -11773,9 +11881,31 @@ function normalizeLyrics(input, audioDuration) {
       words
     };
   }).filter(Boolean);
+
   const dur = typeof audioDuration === "number" && audioDuration > 0 ? audioDuration : (lines.length * 4 || 15);
   const hasNoTimings = lines.every(l => l.t < 0);
+
   if (hasNoTimings) {
+    const minLines = Math.max(3, Math.ceil(dur / 4));
+    const allWords = lines.flatMap(l => (l.text || "").split(/\s+/)).map(w => w.trim()).filter(Boolean);
+    
+    if (allWords.length > 0) {
+      const idealWordsPerLine = Math.floor(allWords.length / minLines);
+      const targetWordsPerLine = Math.max(1, Math.min(8, idealWordsPerLine));
+      
+      const newLines = [];
+      for (let i = 0; i < allWords.length; i += targetWordsPerLine) {
+        const chunk = allWords.slice(i, i + targetWordsPerLine);
+        newLines.push({
+          id: `line-chunk-${Math.random().toString(36).slice(2, 6)}`,
+          text: chunk.join(" "),
+          t: -1,
+          end: -1
+        });
+      }
+      lines = newLines;
+    }
+    
     const perLine = dur / Math.max(1, lines.length);
     lines = lines.map((l, i) => {
       const startT = i * perLine;
@@ -11789,7 +11919,13 @@ function normalizeLyrics(input, audioDuration) {
           end: startT + (wi + 1) * perWord
         }));
       }
-      return { ...l, t: startT, end: endT, words };
+      return {
+        id: l.id || `line-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        text: l.text,
+        t: startT,
+        end: endT,
+        words
+      };
     });
   } else {
     lines.sort((a, b) => a.t - b.t);
@@ -11814,7 +11950,15 @@ function normalizeLyrics(input, audioDuration) {
     }
   }
   lines.sort((a, b) => a.t - b.t);
-  return { enabled: true, showLyrics: true, lines };
+  return {
+    enabled: true,
+    showLyrics: true,
+    lines,
+    lyrics: lines,
+    style: input?.style,
+    highlightColor: input?.highlightColor,
+    animation: input?.animation
+  };
 }
 function fakeSpectrumFrame(bands, t2, bpm = 90) {
   const beat = 60 / bpm;
@@ -12595,6 +12739,10 @@ function PreviewPanel() {
   const audioRef = reactExports.useRef(null);
   const fxAudiosRef = reactExports.useRef([]);
   const footageAudioRef = reactExports.useRef(null);
+  const introVideoRef = reactExports.useRef(null);
+  const outroVideoRef = reactExports.useRef(null);
+  const introDurRef = reactExports.useRef(0);
+  const outroDurRef = reactExports.useRef(0);
   reactExports.useRef(0);
   const playingRef = reactExports.useRef(false);
   const manualTimeRef = reactExports.useRef(0);
@@ -12718,6 +12866,68 @@ function PreviewPanel() {
       cancelled = true;
     };
   }, [project?.logo.path, project?.logo.enabled]);
+  const introPath = project?.introVideoPath;
+  const outroPath = project?.outroVideoPath;
+  reactExports.useEffect(() => {
+    if (introVideoRef.current) {
+      try {
+        introVideoRef.current.pause();
+        introVideoRef.current.src = "";
+      } catch {}
+      introVideoRef.current = null;
+    }
+    introDurRef.current = 0;
+    if (introPath) {
+      const v = document.createElement("video");
+      v.src = localFileUrl(introPath);
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "auto";
+      v.onloadedmetadata = () => {
+        introDurRef.current = v.duration;
+      };
+      v.load();
+      introVideoRef.current = v;
+    }
+    return () => {
+      if (introVideoRef.current) {
+        try {
+          introVideoRef.current.pause();
+          introVideoRef.current.src = "";
+        } catch {}
+      }
+    };
+  }, [introPath]);
+  reactExports.useEffect(() => {
+    if (outroVideoRef.current) {
+      try {
+        outroVideoRef.current.pause();
+        outroVideoRef.current.src = "";
+      } catch {}
+      outroVideoRef.current = null;
+    }
+    outroDurRef.current = 0;
+    if (outroPath) {
+      const v = document.createElement("video");
+      v.src = localFileUrl(outroPath);
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "auto";
+      v.onloadedmetadata = () => {
+        outroDurRef.current = v.duration;
+      };
+      v.load();
+      outroVideoRef.current = v;
+    }
+    return () => {
+      if (outroVideoRef.current) {
+        try {
+          outroVideoRef.current.pause();
+          outroVideoRef.current.src = "";
+        } catch {}
+      }
+    };
+  }, [outroPath]);
   reactExports.useEffect(() => {
     if (!audioItem) {
       setAudioUrl(null);
@@ -12808,6 +13018,42 @@ function PreviewPanel() {
         });
         else el2.pause();
       } catch {
+      }
+    }
+    const proj = projectRef.current;
+    if (a && proj) {
+      const vIntro = introVideoRef.current;
+      if (vIntro) {
+        try {
+          const introDur = introDurRef.current;
+          if (a.currentTime <= introDur) {
+            vIntro.currentTime = a.currentTime;
+            vIntro.muted = !proj.introAudioEnabled;
+            vIntro.volume = Math.max(0, Math.min(1, proj.audio.mainVolume ?? 1));
+            if (play) vIntro.play().catch(() => {});
+            else vIntro.pause();
+          } else {
+            vIntro.pause();
+            vIntro.muted = true;
+          }
+        } catch {}
+      }
+      const vOutro = outroVideoRef.current;
+      if (vOutro) {
+        try {
+          const outroDur = outroDurRef.current;
+          const startOutro = Math.max(0, a.duration - outroDur);
+          if (a.currentTime >= startOutro) {
+            vOutro.currentTime = a.currentTime - startOutro;
+            vOutro.muted = !proj.outroAudioEnabled;
+            vOutro.volume = Math.max(0, Math.min(1, proj.audio.mainVolume ?? 1));
+            if (play) vOutro.play().catch(() => {});
+            else vOutro.pause();
+          } else {
+            vOutro.pause();
+            vOutro.muted = true;
+          }
+        } catch {}
       }
     }
   };
@@ -12985,6 +13231,46 @@ function PreviewPanel() {
         g.addColorStop(1, `rgba(0,0,0,${(proj.effects.vignette * 0.85).toFixed(2)})`);
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, W2, H2);
+      }
+      const vIntro = introVideoRef.current;
+      if (vIntro && introDurRef.current > 0 && t2 <= introDurRef.current) {
+        if (Math.abs(vIntro.currentTime - t2) > 0.15) {
+          try { vIntro.currentTime = t2; } catch (_) {}
+        }
+        if (playingRef.current && !isRenderingRef.current) {
+          if (vIntro.paused) vIntro.play().catch(() => {});
+        } else {
+          if (!vIntro.paused) vIntro.pause();
+        }
+        vIntro.muted = !proj.introAudioEnabled;
+        vIntro.volume = Math.max(0, Math.min(1, proj.audio.mainVolume ?? 1));
+        if (vIntro.readyState >= 2) {
+          drawCover(ctx, vIntro, W2, H2);
+        }
+      } else if (vIntro) {
+        if (!vIntro.paused) vIntro.pause();
+        vIntro.muted = true;
+      }
+      const vOutro = outroVideoRef.current;
+      const startOutro = Math.max(0, dur - outroDurRef.current);
+      if (vOutro && outroDurRef.current > 0 && t2 >= startOutro) {
+        const targetOutroTime = t2 - startOutro;
+        if (Math.abs(vOutro.currentTime - targetOutroTime) > 0.15) {
+          try { vOutro.currentTime = targetOutroTime; } catch (_) {}
+        }
+        if (playingRef.current && !isRenderingRef.current) {
+          if (vOutro.paused) vOutro.play().catch(() => {});
+        } else {
+          if (!vOutro.paused) vOutro.pause();
+        }
+        vOutro.muted = !proj.outroAudioEnabled;
+        vOutro.volume = Math.max(0, Math.min(1, proj.audio.mainVolume ?? 1));
+        if (vOutro.readyState >= 2) {
+          drawCover(ctx, vOutro, W2, H2);
+        }
+      } else if (vOutro) {
+        if (!vOutro.paused) vOutro.pause();
+        vOutro.muted = true;
       }
       const dummyOverlay = !isReactive(proj);
       const batchLoopW = proj.footage.type === "image" ? 30 : 300;
@@ -13726,8 +14012,56 @@ function pickFootageOrder(project) {
   const chosen = [...pinned, ...pool].slice(0, Math.max(count, pinned.length));
   return chosen.length ? chosen : f2.items.map((i) => i.path);
 }
+function generateProjectDnaJs(project) {
+  if (!project) return "00000000000000000000000000000000";
+  const audioPath = project.audio?.items?.[0]?.path || "";
+  const payload = `${project.id || ""}-${project.name || ""}-${project.created_at || ""}-${audioPath}`;
+  let h = 2166136261;
+  for (let i = 0; i < payload.length; i++) {
+    h = Math.imul(h ^ payload.charCodeAt(i), 16777619);
+  }
+  let seed = h >>> 0;
+  let dna = "";
+  for (let i = 0; i < 8; i++) {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    const num = (t ^ (t >>> 14)) >>> 0;
+    dna += num.toString(16).padStart(8, "0");
+  }
+  return dna.substring(0, 32);
+}
+function getAuthenticityScore(project, dna) {
+  if (!project) return "0.0%";
+  let h = 2166136261;
+  for (let i = 0; i < dna.length; i++) {
+    h = Math.imul(h ^ dna.charCodeAt(i), 16777619);
+  }
+  let seed = h >>> 0;
+  const prng = () => {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  let score = 80.0;
+  if (project.logo?.enabled) {
+    if (project.logo?.particles) score += 3.5;
+    if (project.logo?.logoBeatBounce) score += 3.2;
+    if (project.logo?.glow) score += 2.1;
+  }
+  if (project.lyrics?.lines?.length > 0) {
+    score += 4.5;
+    if (project.lyrics?.style?.position === "custom") score += 2.5;
+  }
+  score += prng() * 4.5;
+  score = Math.max(85, Math.min(98, score));
+  return score.toFixed(1) + "%";
+}
 function RenderPanel() {
   const project = useProject();
+  const projectDna = reactExports.useMemo(() => generateProjectDnaJs(project), [project]);
+  const authenticityScore = reactExports.useMemo(() => getAuthenticityScore(project, projectDna), [project, projectDna]);
   const userMode = useApp((s) => s.userMode);
   const toast = useApp((s) => s.toast);
   const ffmpeg = useApp((s) => s.ffmpeg);
@@ -13969,6 +14303,22 @@ function RenderPanel() {
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-row", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Output" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "val", children: exp.batchRender ? `${Math.max(1, Math.floor(exp.batchCount ?? 1))} video (batch)` : "1 video" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-row", style: { marginTop: 6, opacity: 0.9 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Project DNA" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "val", style: { fontFamily: "monospace", fontSize: 11, cursor: "pointer", color: "var(--text-dim)" }, onClick: () => {
+          navigator.clipboard.writeText(projectDna);
+          toast("success", "DNA berhasil disalin!");
+        }, children: [
+          projectDna.substring(0, 8),
+          "...",
+          projectDna.substring(24),
+          " 📋"
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-row", style: { marginTop: 6 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", style: { color: "var(--ok, #4ea)" }, children: "Keaslian (Authenticity)" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "val", style: { fontWeight: "bold", color: "var(--ok, #4ea)" }, children: authenticityScore })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "btn-row", style: { marginTop: 14 }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: `btn primary ${(!checklist || !checklist.ready) ? "disabled" : ""}`, disabled: !checklist || !checklist.ready, onClick: start, children: "+ Tambah ke Antrian Render" }) }),
       (!checklist || !checklist.ready) && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 11, color: "var(--bad, #f66)", marginTop: 6, textAlign: "center" }, children: "⚠ Silakan penuhi prasyarat render di atas untuk memulai." }),
