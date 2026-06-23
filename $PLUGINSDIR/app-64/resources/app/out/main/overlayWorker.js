@@ -214,6 +214,49 @@ function frameSourceFromBin(info) {
     }
   };
 }
+function getResizeFilterSync(inW, inH, targetW, targetH, exp) {
+  const inAspect = inW / inH;
+  const targetAspect = targetW / targetH;
+  let effectiveMode = exp.resizeMode || "smartAutoFix";
+  if (effectiveMode === "smartAutoFix") {
+    const diff = Math.abs(inAspect - targetAspect);
+    if (diff < 0.15) {
+      effectiveMode = "fill";
+    } else if (inAspect >= 1.2 && targetAspect <= 0.85) {
+      effectiveMode = "blurBackground";
+    } else if (inAspect <= 0.85 && targetAspect >= 1.2) {
+      effectiveMode = "fit";
+    } else {
+      effectiveMode = "fill";
+    }
+  }
+  const cleanColor = (exp.backgroundColor || "#000000").replace("#", "0x");
+  if (effectiveMode === "fit") {
+    return `scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2:color=${cleanColor},setsar=1`;
+  } else if (effectiveMode === "crop") {
+    const z = Math.max(1, exp.zoom || 1);
+    const cxNormalized = typeof exp.cropX === "number" ? exp.cropX : 0.5;
+    const cyNormalized = typeof exp.cropY === "number" ? exp.cropY : 0.5;
+    let sw, sh2;
+    if (inAspect > targetAspect) {
+      sh2 = targetH * z;
+      sw = sh2 * inAspect;
+    } else {
+      sw = targetW * z;
+      sh2 = sw / inAspect;
+    }
+    const makeEven = (val) => Math.round(val / 2) * 2;
+    const swEven = makeEven(sw);
+    const shEven = makeEven(sh2);
+    const cxEven = makeEven((swEven - targetW) * cxNormalized);
+    const cyEven = makeEven((shEven - targetH) * cyNormalized);
+    return `scale=${swEven}:${shEven},crop=${targetW}:${targetH}:${cxEven}:${cyEven},setsar=1`;
+  } else if (effectiveMode === "blurBackground") {
+    return `split[bg][fg];[bg]scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},gblur=sigma=20[bg_blurred];[fg]scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease[fg_scaled];[bg_blurred][fg_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1`;
+  } else {
+    return `scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},setsar=1`;
+  }
+}
 async function run(job) {
   const { project, W, H, fps } = job;
   const srcFor = (bands) => {
@@ -252,7 +295,9 @@ async function run(job) {
     args.push("-f", "lavfi", "-t", segLen.toFixed(3), "-i", `color=c=black:s=${W}x${H}:r=${fps}`);
   }
   args.push("-f", "rawvideo", "-pixel_format", "rgba", "-video_size", `${W}x${H}`, "-framerate", String(fps), "-i", "pipe:0");
-  const fc = `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${fps},format=yuv420p[base];[1:v]format=rgba[ov];[base][ov]overlay=0:0:format=auto[v];[v]format=yuv420p[vf]`;
+  const exp = project.export;
+  const resizeFilter = getResizeFilterSync(job.footage.width || W, job.footage.height || H, W, H, exp);
+  const fc = `[0:v]${resizeFilter},fps=${fps},format=yuv420p[base];[1:v]format=rgba[ov];[base][ov]overlay=0:0:format=auto[v];[v]format=yuv420p[vf]`;
   args.push("-filter_complex", fc, "-map", "[vf]", "-t", segLen.toFixed(3), "-r", String(fps));
   args.push("-c:v", job.vcodec, ...job.encoderArgs, "-pix_fmt", "yuv420p", "-an", job.segPath);
   const ff = node_child_process.spawn(job.ffmpeg, args, { windowsHide: true });

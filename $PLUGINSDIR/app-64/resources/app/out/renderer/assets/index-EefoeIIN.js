@@ -13221,7 +13221,7 @@ function PreviewPanel() {
           const v2 = item.video;
           if (!isRenderingRef.current && v2.paused) v2.play().catch(() => {
           });
-          if (v2.videoWidth) drawCover(ctx, v2, W2, H2);
+          if (v2.videoWidth) drawFootageWithMode(ctx, v2, W2, H2, proj);
           else {
             ctx.fillStyle = "#111";
             ctx.fillRect(0, 0, W2, H2);
@@ -13230,7 +13230,7 @@ function PreviewPanel() {
             if (k2 !== idx && imgs[k2].video && !imgs[k2].video.paused) imgs[k2].video.pause();
           }
         } else if (item.img) {
-          drawCover(ctx, item.img, W2, H2);
+          drawFootageWithMode(ctx, item.img, W2, H2, proj);
         }
       } else {
         ctx.fillStyle = "#111";
@@ -13260,7 +13260,7 @@ function PreviewPanel() {
         vIntro.muted = !proj.introAudioEnabled;
         vIntro.volume = Math.max(0, Math.min(1, proj.audio.mainVolume ?? 1));
         if (vIntro.readyState >= 2) {
-          drawCover(ctx, vIntro, W2, H2);
+          drawFit(ctx, vIntro, W2, H2);
         }
       } else if (vIntro) {
         if (!vIntro.paused) vIntro.pause();
@@ -13281,7 +13281,7 @@ function PreviewPanel() {
         vOutro.muted = !proj.outroAudioEnabled;
         vOutro.volume = Math.max(0, Math.min(1, proj.audio.mainVolume ?? 1));
         if (vOutro.readyState >= 2) {
-          drawCover(ctx, vOutro, W2, H2);
+          drawFit(ctx, vOutro, W2, H2);
         }
       } else if (vOutro) {
         if (!vOutro.paused) vOutro.pause();
@@ -13736,6 +13736,116 @@ function drawCover(ctx, src, W2, H2) {
   }
   ctx.drawImage(src, (W2 - dw) / 2, (H2 - dh2) / 2, dw, dh2);
 }
+function drawFit(ctx, src, W2, H2, bgColor) {
+  const sw = src.videoWidth || src.naturalWidth || src.width || W2;
+  const sh2 = src.videoHeight || src.naturalHeight || src.height || H2;
+  if (!sw || !sh2) return;
+  const ir = sw / sh2;
+  const cr = W2 / H2;
+  let dw = W2;
+  let dh2 = H2;
+  if (ir > cr) {
+    dw = W2;
+    dh2 = W2 / ir;
+  } else {
+    dh2 = H2;
+    dw = H2 * ir;
+  }
+  const dx = (W2 - dw) / 2;
+  const dy = (H2 - dh2) / 2;
+  ctx.save();
+  if (bgColor !== "transparent") {
+    ctx.fillStyle = bgColor || "#000000";
+    ctx.fillRect(0, 0, W2, H2);
+  }
+  ctx.drawImage(src, dx, dy, dw, dh2);
+  ctx.restore();
+}
+function drawFill(ctx, src, W2, H2) {
+  const sw = src.videoWidth || src.naturalWidth || src.width || W2;
+  const sh2 = src.videoHeight || src.naturalHeight || src.height || H2;
+  if (!sw || !sh2) return;
+  const ir = sw / sh2;
+  const cr = W2 / H2;
+  let dw = W2;
+  let dh2 = H2;
+  if (ir > cr) {
+    dh2 = H2;
+    dw = H2 * ir;
+  } else {
+    dw = W2;
+    dh2 = W2 / ir;
+  }
+  ctx.drawImage(src, (W2 - dw) / 2, (H2 - dh2) / 2, dw, dh2);
+}
+function drawBlurBackground(ctx, src, W2, H2) {
+  const sw = src.videoWidth || src.naturalWidth || src.width || W2;
+  const sh2 = src.videoHeight || src.naturalHeight || src.height || H2;
+  if (!sw || !sh2) return;
+  ctx.save();
+  ctx.filter = "blur(20px)";
+  const ir = sw / sh2;
+  const cr = W2 / H2;
+  let bgw = W2, bgh = H2;
+  if (ir > cr) {
+    bgh = H2;
+    bgw = H2 * ir;
+  } else {
+    bgw = W2;
+    bgh = W2 / ir;
+  }
+  ctx.drawImage(src, (W2 - bgw) / 2 - 20, (H2 - bgh) / 2 - 20, bgw + 40, bgh + 40);
+  ctx.filter = "none";
+  ctx.restore();
+  drawFit(ctx, src, W2, H2, "transparent");
+}
+function drawFootageWithMode(ctx, src, W2, H2, proj) {
+  const exp = proj.export || {};
+  let mode = exp.resizeMode || "smartAutoFix";
+  const sw = src.videoWidth || src.naturalWidth || src.width || W2;
+  const sh2 = src.videoHeight || src.naturalHeight || src.height || H2;
+  const inAspect = sw / sh2;
+  const targetAspect = W2 / H2;
+  if (mode === "smartAutoFix") {
+    const diff = Math.abs(inAspect - targetAspect);
+    if (diff < 0.15) {
+      mode = "fill";
+    } else if (inAspect >= 1.2 && targetAspect <= 0.85) {
+      mode = "blurBackground";
+    } else if (inAspect <= 0.85 && targetAspect >= 1.2) {
+      mode = "fit";
+    } else {
+      mode = "fill";
+    }
+  }
+  if (mode === "fit") {
+    drawFit(ctx, src, W2, H2, exp.backgroundColor || "#000000");
+  } else if (mode === "crop") {
+    ctx.save();
+    const zoom = Math.max(1, exp.zoom || 1);
+    const cropX = typeof exp.cropX === "number" ? exp.cropX : 0.5;
+    const cropY = typeof exp.cropY === "number" ? exp.cropY : 0.5;
+    let dw, dh2;
+    if (inAspect > targetAspect) {
+      dh2 = H2 * zoom;
+      dw = dh2 * inAspect;
+    } else {
+      dw = W2 * zoom;
+      dh2 = dw / inAspect;
+    }
+    const dx = (W2 - dw) * cropX;
+    const dy = (H2 - dh2) * cropY;
+    ctx.beginPath();
+    ctx.rect(0, 0, W2, H2);
+    ctx.clip();
+    ctx.drawImage(src, dx, dy, dw, dh2);
+    ctx.restore();
+  } else if (mode === "blurBackground") {
+    drawBlurBackground(ctx, src, W2, H2);
+  } else {
+    drawFill(ctx, src, W2, H2);
+  }
+}
 function resampleBands(src, n2) {
   const m2 = src.length;
   if (m2 === 0) return new Array(n2).fill(0);
@@ -13999,12 +14109,14 @@ function placeholder(ctx, text, style, W2, H2) {
 const ASPECTS = {
   "16:9": [16, 9],
   "9:16": [9, 16],
-  "1:1": [1, 1]
+  "1:1": [1, 1],
+  "4:5": [4, 5],
+  "custom": null
 };
 const RES_BY_HEIGHT = { 720: 720, 1080: 1080, 1440: 1440, 2160: 2160 };
 function applyResolution(exp, height, aspect) {
   exp.aspect = aspect;
-  if (aspect in ASPECTS) {
+  if (aspect in ASPECTS && ASPECTS[aspect]) {
     const [aw, ah2] = ASPECTS[aspect];
     exp.height = height;
     exp.width = Math.round(height * aw / ah2 / 2) * 2;
@@ -14176,9 +14288,116 @@ function RenderPanel() {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid2", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Format Video" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Resolusi", value: String(exp.height), options: [{ value: "720", label: "720p — HD" }, { value: "1080", label: "1080p — Full HD" }, { value: "1440", label: "1440p — 2K" }, { value: "2160", label: "4K — Ultra HD" }], onChange: (v2) => patchProject((p2) => (applyResolution(p2.export, RES_BY_HEIGHT[parseInt(v2)], p2.export.aspect), p2)) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Rasio layar", value: exp.aspect === "custom" ? "16:9" : exp.aspect, options: [{ value: "16:9", label: "16:9 (horizontal/landscape)" }, { value: "9:16", label: "9:16 (vertikal/shorts)" }, { value: "1:1", label: "1:1 (kotak)" }], onChange: (v2) => patchProject((p2) => (applyResolution(p2.export, p2.export.height, v2), p2)) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Frame rate", value: String(exp.fps), options: [{ value: "24", label: "24 fps — sinematik" }, { value: "30", label: "30 fps — standar" }, { value: "60", label: "60 fps — halus" }], onChange: (v2) => patchProject((p2) => (p2.export.fps = parseInt(v2), p2)) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Preset Platform", value: exp.platformPreset || "youtube_landscape", options: [
+          { value: "youtube_landscape", label: "YouTube Landscape (16:9)" },
+          { value: "tiktok_reels_shorts", label: "TikTok / Reels / Shorts (9:16)" },
+          { value: "instagram_feed_square", label: "Instagram Feed (1:1)" },
+          { value: "instagram_feed_portrait", label: "Instagram Feed (4:5)" },
+          { value: "story", label: "Story (9:16)" },
+          { value: "facebook_feed", label: "Facebook Feed (1:1)" },
+          { value: "custom", label: "Kustom / Manual" }
+        ], onChange: (v2) => patchProject((p2) => {
+          p2.export.platformPreset = v2;
+          if (v2 === "youtube_landscape") {
+            applyResolution(p2.export, 1080, "16:9");
+          } else if (v2 === "tiktok_reels_shorts" || v2 === "story") {
+            applyResolution(p2.export, 1920, "9:16");
+          } else if (v2 === "instagram_feed_square" || v2 === "facebook_feed") {
+            applyResolution(p2.export, 1080, "1:1");
+          } else if (v2 === "instagram_feed_portrait") {
+            applyResolution(p2.export, 1350, "4:5");
+          }
+          return p2;
+        }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Rasio layar", value: exp.aspect, options: [
+          { value: "16:9", label: "16:9 (Landscape)" },
+          { value: "9:16", label: "9:16 (Vertikal)" },
+          { value: "1:1", label: "1:1 (Kotak)" },
+          { value: "4:5", label: "4:5 (Instagram)" },
+          { value: "custom", label: "Kustom (Manual)" }
+        ], onChange: (v2) => patchProject((p2) => {
+          if (v2 !== "custom") {
+            applyResolution(p2.export, p2.export.height, v2);
+          } else {
+            p2.export.aspect = "custom";
+          }
+          return p2;
+        }) }),
+        exp.aspect === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsx(Field, { label: "Lebar (Width)", children: 
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", {
+            type: "number",
+            className: "inp",
+            value: exp.width || 1920,
+            onChange: (e) => patchProject((p2) => {
+              const val = parseInt(e.target.value) || 1920;
+              p2.export.width = Math.round(val / 2) * 2;
+              return p2;
+            })
+          })
+        }),
+        exp.aspect === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsx(Field, { label: "Tinggi (Height)", children: 
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", {
+            type: "number",
+            className: "inp",
+            value: exp.height || 1080,
+            onChange: (e) => patchProject((p2) => {
+              const val = parseInt(e.target.value) || 1080;
+              p2.export.height = Math.round(val / 2) * 2;
+              return p2;
+            })
+          })
+        }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Resolusi Preset", value: String(exp.height), options: [
+          { value: "720", label: "720p — HD" },
+          { value: "1080", label: "1080p — Full HD" },
+          { value: "1440", label: "1440p — 2K" },
+          { value: "2160", label: "4K — Ultra HD" }
+        ], onChange: (v2) => patchProject((p2) => {
+          const h = parseInt(v2);
+          if (p2.export.aspect !== "custom") {
+            applyResolution(p2.export, h, p2.export.aspect);
+          } else {
+            p2.export.height = h;
+          }
+          return p2;
+        }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Frame rate", value: String(exp.fps), options: [
+          { value: "24", label: "24 fps — sinematik" },
+          { value: "30", label: "30 fps — standar" },
+          { value: "60", label: "60 fps — halus" }
+        ], onChange: (v2) => patchProject((p2) => (p2.export.fps = parseInt(v2), p2)) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Penyesuaian Visual", value: exp.resizeMode || "smartAutoFix", options: [
+          { value: "smartAutoFix", label: "Smart Auto-Fix (Rekomendasi)" },
+          { value: "fit", label: "Fit (Borders/Padding)" },
+          { value: "fill", label: "Fill (Penuh/Potong)" },
+          { value: "crop", label: "Crop Manual (Zoom/Geser)" },
+          { value: "blurBackground", label: "Blur Background" }
+        ], onChange: (v2) => patchProject((p2) => (p2.export.resizeMode = v2, p2)) }),
+        (exp.resizeMode === "fit" || exp.resizeMode === "blurBackground" || exp.resizeMode === "smartAutoFix") && 
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Select, { label: "Tipe Background", value: exp.backgroundMode || "blur", options: [
+            { value: "blur", label: "Blur footage" },
+            { value: "color", label: "Warna solid" }
+          ], onChange: (v2) => patchProject((p2) => (p2.export.backgroundMode = v2, p2)) }),
+        (exp.resizeMode === "fit" || exp.resizeMode === "blurBackground" || exp.resizeMode === "smartAutoFix") && exp.backgroundMode === "color" &&
+          /* @__PURE__ */ jsxRuntimeExports.jsx(ColorInput, { label: "Warna Background", value: exp.backgroundColor || "#000000", onChange: (v2) => patchProject((p2) => (p2.export.backgroundColor = v2, p2)) }),
+        (exp.resizeMode === "crop" || exp.resizeMode === "smartAutoFix") && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Zoom Scale", min: 1, max: 3, step: 0.05, value: exp.zoom ?? 1, onChange: (v2) => patchProject((p2) => (p2.export.zoom = v2, p2)) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Posisi Crop X (Horizontal)", min: 0, max: 1, step: 0.05, value: exp.cropX ?? 0.5, onChange: (v2) => patchProject((p2) => (p2.export.cropX = v2, p2)) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Slider, { label: "Posisi Crop Y (Vertikal)", min: 0, max: 1, step: 0.05, value: exp.cropY ?? 0.5, onChange: (v2) => patchProject((p2) => (p2.export.cropY = v2, p2)) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn", style: { marginTop: 10, width: "100%" }, onClick: () => patchProject((p2) => {
+          p2.export.platformPreset = "youtube_landscape";
+          p2.export.aspect = "16:9";
+          p2.export.width = 1920;
+          p2.export.height = 1080;
+          p2.export.resizeMode = "smartAutoFix";
+          p2.export.zoom = 1.0;
+          p2.export.cropX = 0.5;
+          p2.export.cropY = 0.5;
+          p2.export.backgroundMode = "blur";
+          p2.export.backgroundColor = "#000000";
+          return p2;
+        }), children: "Reset ke Rekomendasi Otomatis" }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "soon", children: [
           "Output: ",
           exp.width,

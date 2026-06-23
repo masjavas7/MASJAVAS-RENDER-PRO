@@ -695,6 +695,13 @@ const exportDefault = {
   width: 1920,
   height: 1080,
   aspect: "16:9",
+  platformPreset: "youtube_landscape",
+  resizeMode: "smartAutoFix",
+  zoom: 1,
+  cropX: 0.5,
+  cropY: 0.5,
+  backgroundMode: "blur",
+  backgroundColor: "#000000",
   fps: 30,
   bitrate: "auto",
   encoder: "auto",
@@ -798,7 +805,17 @@ class ProjectService {
       customOverlays: data.customOverlays || [],
       logo: { ...base.logo, ...data.logo || {} },
       effects: { ...base.effects, ...data.effects || {} },
-      export: { ...base.export, ...data.export || {} },
+      export: {
+        ...base.export,
+        ...data.export || {},
+        platformPreset: data.export?.platformPreset ?? base.export.platformPreset,
+        resizeMode: data.export?.resizeMode ?? base.export.resizeMode,
+        cropX: data.export?.cropX ?? base.export.cropX,
+        cropY: data.export?.cropY ?? base.export.cropY,
+        zoom: data.export?.zoom ?? base.export.zoom,
+        backgroundMode: data.export?.backgroundMode ?? base.export.backgroundMode,
+        backgroundColor: data.export?.backgroundColor ?? base.export.backgroundColor
+      },
       stickers: data.stickers || [],
       // Migrate unified toggles from the legacy mode/batch when absent, so old projects
       // open with the correct lyrics/playlist/spectrum state (the shared helpers do the
@@ -2839,6 +2856,17 @@ async function renderOverlaySegmentsMT(opts) {
   const workerScript = node_path.join(__dirname, "overlayWorker.js");
   opts.log(`MT: ${N} worker × segmen (${cores} core) — render paralel`);
   const tasks = [];
+  let imageW = W, imageH = H;
+  if (opts.imagePath) {
+    try {
+      const info = await probeService.probe(opts.imagePath);
+      if (info && info.width && info.height) {
+        imageW = info.width;
+        imageH = info.height;
+      }
+    } catch (e) {
+    }
+  }
   for (let k = 0; k < N; k++) {
     const blockStart = k * segFrames;
     if (blockStart >= totalFrames) break;
@@ -2857,7 +2885,7 @@ async function renderOverlaySegmentsMT(opts) {
       blockStart,
       blockEnd,
       renderDur: duration,
-      footage: { type: opts.imagePath ? "image" : "none", imagePath: opts.imagePath },
+      footage: { type: opts.imagePath ? "image" : "none", imagePath: opts.imagePath, width: imageW, height: imageH },
       vcodec: opts.vcodec,
       encoderArgs: opts.encoderArgs,
       project,
@@ -3618,6 +3646,59 @@ class RenderService {
       this.currentProjectName = null;
     }
   }
+  async getResizeFilter(inputPath, targetW, targetH, resizeMode, zoom, cropX, cropY, backgroundMode, backgroundColor) {
+    let inW = targetW;
+    let inH = targetH;
+    try {
+      const info = await probeService.probe(inputPath);
+      if (info && info.width && info.height) {
+        inW = info.width;
+        inH = info.height;
+      }
+    } catch (err) {
+    }
+    const inAspect = inW / inH;
+    const targetAspect = targetW / targetH;
+    let effectiveMode = resizeMode || "smartAutoFix";
+    if (effectiveMode === "smartAutoFix") {
+      const diff = Math.abs(inAspect - targetAspect);
+      if (diff < 0.15) {
+        effectiveMode = "fill";
+      } else if (inAspect >= 1.2 && targetAspect <= 0.85) {
+        effectiveMode = "blurBackground";
+      } else if (inAspect <= 0.85 && targetAspect >= 1.2) {
+        effectiveMode = "fit";
+      } else {
+        effectiveMode = "fill";
+      }
+    }
+    const cleanColor = (backgroundColor || "#000000").replace("#", "0x");
+    if (effectiveMode === "fit") {
+      return `scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2:color=${cleanColor},setsar=1`;
+    } else if (effectiveMode === "crop") {
+      const z = Math.max(1, zoom || 1);
+      const cxNormalized = typeof cropX === "number" ? cropX : 0.5;
+      const cyNormalized = typeof cropY === "number" ? cropY : 0.5;
+      let sw, sh2;
+      if (inAspect > targetAspect) {
+        sh2 = targetH * z;
+        sw = sh2 * inAspect;
+      } else {
+        sw = targetW * z;
+        sh2 = sw / inAspect;
+      }
+      const makeEven = (val) => Math.round(val / 2) * 2;
+      const swEven = makeEven(sw);
+      const shEven = makeEven(sh2);
+      const cxEven = makeEven((swEven - targetW) * cxNormalized);
+      const cyEven = makeEven((shEven - targetH) * cyNormalized);
+      return `scale=${swEven}:${shEven},crop=${targetW}:${targetH}:${cxEven}:${cyEven},setsar=1`;
+    } else if (effectiveMode === "blurBackground") {
+      return `split[bg][fg];[bg]scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},gblur=sigma=20[bg_blurred];[fg]scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease[fg_scaled];[bg_blurred][fg_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1`;
+    } else {
+      return `scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},setsar=1`;
+    }
+  }
   async buildArgs(project, job, duration, encoderId, quality, timeline, tmpDir, log, baseVideoPath = null, prerendered = [], phase = "single", baseWindow, audioMapPath) {
     const exp = project.export;
     const W = exp.width;
@@ -3660,12 +3741,24 @@ class RenderService {
       footageInputCount = 1;
       footageFilters.push(`[0:v]format=yuv420p[base]`);
     } else if (segments.length <= MAX_FILTER_INPUTS) {
-      const norm = (idx, dur, out) => `[${idx}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${fps},trim=duration=${dur.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p${out}`;
       for (let k = 0; k < segments.length; k++) {
         const seg = segments[k];
         if (timeline.isImage) inputs.push("-loop", "1");
         inputs.push("-t", seg.dur.toFixed(3), "-i", seg.path);
-        footageFilters.push(norm(k, seg.dur, `[c${k}]`));
+        const resizeFilter = await this.getResizeFilter(
+          seg.path,
+          W,
+          H,
+          exp.resizeMode,
+          exp.zoom,
+          exp.cropX,
+          exp.cropY,
+          exp.backgroundMode,
+          exp.backgroundColor
+        );
+        footageFilters.push(
+          `[${k}:v]${resizeFilter},fps=${fps},trim=duration=${seg.dur.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[c${k}]`
+        );
       }
       footageInputCount = segments.length;
       const hasDistinctBoundary = segments.some((s, k) => k > 0 && segments[k - 1].path !== s.path);
@@ -3711,8 +3804,19 @@ class RenderService {
       cleanupPaths.push(concatFile);
       inputs.push("-f", "concat", "-safe", "0", "-i", concatFile);
       footageInputCount = 1;
+      const resizeFilterConcat = segments[0] ? await this.getResizeFilter(
+        segments[0].path,
+        W,
+        H,
+        exp.resizeMode,
+        exp.zoom,
+        exp.cropX,
+        exp.cropY,
+        exp.backgroundMode,
+        exp.backgroundColor
+      ) : `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
       footageFilters.push(
-        `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${fps},trim=duration=${renderLen.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[base]`
+        `[0:v]${resizeFilterConcat},fps=${fps},trim=duration=${renderLen.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[base]`
       );
     }
     log(`Footage segments: ${segments.length}${seamless ? " (seamless loop)" : ""}`);
@@ -4694,12 +4798,22 @@ class RenderService {
     const baseDur = timeline.baseDur;
     const inputs = [];
     const fcs = [];
-    const norm = (idx, dur, out) => `[${idx}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${fps},trim=duration=${dur.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p${out}`;
     const seamless = (project.footage.seamlessLoop ?? false) && project.footage.type === "video";
     const MAX_FILTER_INPUTS = 120;
     if (segments.length === 1 && timeline.isImage) {
       inputs.push("-loop", "1", "-t", baseDur.toFixed(3), "-i", segments[0].path);
-      fcs.push(norm(0, baseDur, "[base]"));
+      const resizeFilter = await this.getResizeFilter(
+        segments[0].path,
+        W,
+        H,
+        exp.resizeMode,
+        exp.zoom,
+        exp.cropX,
+        exp.cropY,
+        exp.backgroundMode,
+        exp.backgroundColor
+      );
+      fcs.push(`[0:v]${resizeFilter},fps=${fps},trim=duration=${baseDur.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[base]`);
     } else if (segments.length <= MAX_FILTER_INPUTS) {
       for (let k = 0; k < segments.length; k++) {
         const seg = segments[k];
@@ -4708,7 +4822,20 @@ class RenderService {
         } else {
           inputs.push("-t", seg.dur.toFixed(3), "-i", seg.path);
         }
-        fcs.push(norm(k, seg.dur, `[c${k}]`));
+        const resizeFilter = await this.getResizeFilter(
+          seg.path,
+          W,
+          H,
+          exp.resizeMode,
+          exp.zoom,
+          exp.cropX,
+          exp.cropY,
+          exp.backgroundMode,
+          exp.backgroundColor
+        );
+        fcs.push(
+          `[${k}:v]${resizeFilter},fps=${fps},trim=duration=${seg.dur.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[c${k}]`
+        );
       }
       const hasDistinctBoundary = segments.some((s, k) => k > 0 && segments[k - 1].path !== s.path);
       const CROSS = 0.5;
@@ -4746,8 +4873,19 @@ class RenderService {
       lines.push(`file '${ffPathEscape(segments[segments.length - 1].path)}'`);
       await node_fs.promises.writeFile(concatFile, lines.join("\n"), "utf-8");
       inputs.push("-f", "concat", "-safe", "0", "-i", concatFile);
+      const resizeFilterConcat = segments[0] ? await this.getResizeFilter(
+        segments[0].path,
+        W,
+        H,
+        exp.resizeMode,
+        exp.zoom,
+        exp.cropX,
+        exp.cropY,
+        exp.backgroundMode,
+        exp.backgroundColor
+      ) : `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
       fcs.push(
-        `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${fps},trim=duration=${baseDur.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[base]`
+        `[0:v]${resizeFilterConcat},fps=${fps},trim=duration=${baseDur.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[base]`
       );
     }
     const basePath = node_path.join(tmpDir, "base.mp4");
