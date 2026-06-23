@@ -719,6 +719,7 @@ class ProjectService {
       showPlaylist: mode === "playlist",
       spectrumMode: mode === "lyrics" || mode === "playlist" ? "reactive" : "static",
       filePath: null,
+      projectName: null,
       introVideoPath: null,
       outroVideoPath: null,
       introAudioEnabled: false,
@@ -5004,10 +5005,10 @@ function uniqueOutput(path) {
   const ext = node_path.extname(path);
   const stem = node_path.basename(path, ext);
   let n = 1;
-  let candidate = node_path.join(dir, `${stem}_${n}${ext}`);
+  let candidate = node_path.join(dir, `${stem} (${n})${ext}`);
   while (node_fs.existsSync(candidate)) {
     n++;
-    candidate = node_path.join(dir, `${stem}_${n}${ext}`);
+    candidate = node_path.join(dir, `${stem} (${n})${ext}`);
   }
   return candidate;
 }

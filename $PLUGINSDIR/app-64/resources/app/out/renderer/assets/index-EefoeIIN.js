@@ -7569,6 +7569,12 @@ function isReactive(p2) {
   if (p2.spectrumMode) return p2.spectrumMode === "reactive";
   return p2.mode !== "batch";
 }
+function sanitizeFilename(name) {
+  if (!name) return "Untitled Project";
+  let s = name.replace(/[\\/:*?"<>|]/g, " ");
+  s = s.replace(/\s+/g, " ").trim();
+  return s || "Untitled Project";
+}
 function ProjectPanel() {
   const project = useApp((s) => s.project);
   const saveProject = useApp((s) => s.saveProject);
@@ -7577,7 +7583,7 @@ function ProjectPanel() {
   const setView = useApp((s) => s.setView);
   if (!project) return null;
   const exportAs = async () => {
-    const target = await window.masjavas.saveFile(`${project.name || "Untitled"}.masjavas`, [
+    const target = await window.masjavas.saveFile(`${project.projectName || project.name || "Untitled"}.masjavas`, [
       { name: "Proyek MASJAVAS", extensions: ["masjavas"] }
     ]);
     if (!target) return;
@@ -7603,8 +7609,8 @@ function ProjectPanel() {
           "input",
           {
             className: "inp",
-            value: project.name,
-            onChange: (e) => setProject({ ...project, name: e.target.value })
+            value: project.projectName || project.name || "",
+            onChange: (e) => setProject({ ...project, name: e.target.value, projectName: e.target.value })
           }
         )
       ] }),
@@ -14111,7 +14117,7 @@ function RenderPanel() {
     const sep = outDir.includes("/") && !outDir.includes("\\") ? "/" : "\\";
     const a = project.audio;
     const count = exp.batchRender ? Math.max(1, Math.floor(exp.batchCount ?? 1)) : 1;
-    const safeName = (project.name || "mix").replace(/[\\/:*?"<>|]/g, "_");
+    const safeName = sanitizeFilename(project.projectName || project.name || "mix");
     const runId = Date.now();
     const pad = (n2) => String(n2).padStart(2, "0");
     const f2 = project.footage;
@@ -15062,7 +15068,51 @@ function App() {
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "v", children: "V1.7" })
       ] }),
       project && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mode-badge", children: project.mode }),
-      project && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "proj-name", children: project.name }),
+      project && /* @__PURE__ */ jsxRuntimeExports.jsx("input", {
+        type: "text",
+        className: "proj-name-input",
+        value: project.projectName || project.name || "Untitled Project",
+        style: {
+          background: "transparent",
+          border: "1px solid transparent",
+          borderRadius: 4,
+          color: "var(--text)",
+          fontSize: 13,
+          fontWeight: 600,
+          padding: "2px 6px",
+          width: 200,
+          cursor: "text"
+        },
+        onFocus: (e) => {
+          e.target.style.border = "1px solid var(--border)";
+          e.target.style.background = "var(--bg-dark)";
+        },
+        onBlur: (e) => {
+          e.target.style.border = "1px solid transparent";
+          e.target.style.background = "transparent";
+          const nextVal = e.target.value.trim();
+          if (nextVal) {
+            patchProject((p) => {
+              p.projectName = nextVal;
+              p.name = nextVal;
+              return p;
+            });
+          }
+        },
+        onKeyDown: (e) => {
+          if (e.key === "Enter") {
+            e.target.blur();
+          }
+        },
+        onChange: (e) => {
+          const val = e.target.value;
+          patchProject((p) => {
+            p.projectName = val;
+            p.name = val;
+            return p;
+          });
+        }
+      }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("button", {
         className: `mode-toggle-btn ${userMode === "beginner" ? "beg" : ""}`,
         onClick: () => {

@@ -30,7 +30,7 @@ RequestExecutionLevel user
 !insertmacro MUI_PAGE_INSTFILES
 
 ; Finish Page Options
-!define MUI_FINISHPAGE_RUN "$INSTDIR\MASJAVAS RENDER PRO.exe"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\MASJAVAS-RENDER-PRO.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Jalankan ${PRODUCT_NAME}"
 !insertmacro MUI_PAGE_FINISH
 
@@ -52,7 +52,7 @@ Section "DummySection" SEC01
   File /r "C:\Users\DELL\Documents\MASJAVAS-RENDER-PRO\$PLUGINSDIR\app-64\*.*"
 
   ; Rename main executable to match product name requirements
-  Rename "$INSTDIR\MASJAVAS V1.7.exe" "$INSTDIR\MASJAVAS RENDER PRO.exe"
+  Rename "$INSTDIR\MASJAVAS V1.7.exe" "$INSTDIR\MASJAVAS-RENDER-PRO.exe"
 
   ; Create uninstaller
   WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -63,17 +63,17 @@ Section "DummySection" SEC01
   ; Write registry keys for Windows uninstaller (Add/Remove Programs)
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" '"$INSTDIR\MASJAVAS RENDER PRO.exe"'
+  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" '"$INSTDIR\MASJAVAS-RENDER-PRO.exe"'
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
 
   ; Create Start Menu Shortcuts
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\MASJAVAS RENDER PRO.exe"
+  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\MASJAVAS-RENDER-PRO.exe"
   CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk" "$INSTDIR\uninstall.exe"
 
   ; Create Desktop Shortcut
-  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\MASJAVAS RENDER PRO.exe"
+  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\MASJAVAS-RENDER-PRO.exe"
 SectionEnd
 
 ; Uninstaller Section
