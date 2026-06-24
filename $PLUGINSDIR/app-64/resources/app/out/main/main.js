@@ -5702,7 +5702,7 @@ function createWindow() {
     show: false,
     backgroundColor: "#0d1117",
     title: "MASJAVAS V1.7",
-    icon: node_path.join(__dirname$1, "../renderer/assets/logo.png"),
+    icon: electron.nativeImage.createFromPath(node_path.join(__dirname$1, "../renderer/assets/logo.png")),
     autoHideMenuBar: true,
     webPreferences: {
       preload: node_path.join(__dirname$1, "../preload/preload.cjs"),
