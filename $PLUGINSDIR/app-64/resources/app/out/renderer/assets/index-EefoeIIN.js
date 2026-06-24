@@ -7469,6 +7469,7 @@ function HomeScreen() {
   }, [loadProjectList]);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "home", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "home-top", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("img", { src: "./assets/logo.png", style: { width: 140, height: 140, marginBottom: 16, objectFit: "contain" } }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "home-brand", children: [
         "MASJAVAS ",
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "v", children: "RENDER PRO 2026" })
@@ -15457,7 +15458,8 @@ function App() {
   });
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "topbar", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "brand", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "brand", style: { display: "flex", alignItems: "center" }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("img", { src: "./assets/logo.png", style: { width: 22, height: 22, objectFit: "contain", marginRight: 8, borderRadius: 2 } }),
         "MASJAVAS ",
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "v", children: "V1.7" })
       ] }),
