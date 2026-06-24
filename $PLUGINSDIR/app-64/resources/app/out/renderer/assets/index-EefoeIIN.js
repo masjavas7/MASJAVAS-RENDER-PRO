@@ -12801,6 +12801,7 @@ function PreviewPanel() {
   const audioItem = project?.audio.items[0] ?? null;
   const W2 = project?.export.width ?? 1920;
   const H2 = project?.export.height ?? 1080;
+  const exp = project?.export ?? {};
   const stageContainerRef = reactExports.useRef(null);
   const [containerSize, setContainerSize] = reactExports.useState({ w: 960, h: 600 });
   reactExports.useEffect(() => {
