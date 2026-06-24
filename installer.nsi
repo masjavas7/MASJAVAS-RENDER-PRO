@@ -69,11 +69,11 @@ Section "DummySection" SEC01
 
   ; Create Start Menu Shortcuts
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\MASJAVAS-RENDER-PRO.exe"
-  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk" "$INSTDIR\uninstall.exe"
+  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\MASJAVAS-RENDER-PRO.exe" "" "$INSTDIR\resources\app.ico" 0
+  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk" "$INSTDIR\uninstall.exe" "" "$INSTDIR\resources\app.ico" 0
 
   ; Create Desktop Shortcut
-  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\MASJAVAS-RENDER-PRO.exe"
+  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\MASJAVAS-RENDER-PRO.exe" "" "$INSTDIR\resources\app.ico" 0
 SectionEnd
 
 ; Uninstaller Section

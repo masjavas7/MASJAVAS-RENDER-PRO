@@ -5702,7 +5702,7 @@ function createWindow() {
     show: false,
     backgroundColor: "#0d1117",
     title: "MASJAVAS V1.7",
-    icon: electron.nativeImage.createFromPath(node_path.join(__dirname$1, "../renderer/assets/logo.png")),
+    icon: electron.nativeImage.createFromPath(node_path.join(__dirname$1, "../../../app.ico")),
     autoHideMenuBar: true,
     webPreferences: {
       preload: node_path.join(__dirname$1, "../preload/preload.cjs"),
@@ -5727,6 +5727,7 @@ function createWindow() {
   });
 }
 electron.app.whenReady().then(async () => {
+  electron.app.setAppUserModelId("com.masjavas.renderpro.2026");
   if (await maybeRunSelfTest()) return;
   electron.protocol.handle("localfile", (request) => {
     const fileUrl = request.url.replace(/^localfile:/, "file:");
