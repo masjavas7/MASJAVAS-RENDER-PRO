@@ -1165,6 +1165,7 @@ async function preprocessAudio(inputPath, outputPath) {
     "-y",
     "-i", inputPath,
     "-vn",
+    "-af", "agate=threshold=-45dB:ratio=2:attack=20:release=250",
     "-ac", "1",
     "-ar", "16000",
     "-b:a", "64k",
@@ -1176,13 +1177,20 @@ async function preprocessAudio(inputPath, outputPath) {
 function sanitizeAndCorrectLines(lines) {
   const isWhisperHallucination = (text) => {
     const clean = text.trim().toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").replace(/\s+/g, " ");
-    const spamPhrases = [
+    const exactSpamPhrases = [
+      "terima kasih telah menonton",
+      "terima kasih sudah menonton",
+      "terima kasih menonton",
+      "terima kasih banyak",
+      "terima kasih",
       "jangan lupa like",
       "jangan lupa subscribe",
+      "jangan lupa like dan subscribe",
+      "jangan lupa subscribe dan like",
       "like dan share",
       "like share",
       "like share subscribe",
-      "like dan subscribe",
+      "like share and subscribe",
       "thank you for watching",
       "thank you",
       "please watch",
@@ -1190,16 +1198,16 @@ function sanitizeAndCorrectLines(lines) {
       "subscribe to my channel",
       "subscribe",
       "like comment",
-      "like share and subscribe",
       "jangan lupa follow",
       "follow instagram",
-      "jangan lupa",
       "tonton sampai habis",
       "tonton terus",
       "support channel",
       "stay tuned"
     ];
-    return spamPhrases.some(phrase => clean === phrase || clean.includes(phrase));
+    const isExactSpam = exactSpamPhrases.some(phrase => clean === phrase);
+    const isShortSpam = (clean === "jangan lupa" || clean === "thank you");
+    return isExactSpam || isShortSpam;
   };
 
   const cleanSpelling = (text) => {
