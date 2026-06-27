@@ -3,8 +3,8 @@
 
 $ErrorActionPreference = "Stop"
 
-$nsisPath = "C:\Users\DELL\AppData\Local\electron-builder\Cache\nsis\nsis-3.0.4.1\makensis.exe"
-$projectRoot = "C:\Users\DELL\Documents\MASJAVAS-RENDER-PRO"
+$projectRoot = $PSScriptRoot
+$nsisPath = Join-Path $env:LOCALAPPDATA "electron-builder\Cache\nsis\nsis-3.0.4.1\makensis.exe"
 $scriptPath = Join-Path $projectRoot "installer.nsi"
 $outputPath = Join-Path $projectRoot "MASJAVAS-RENDER-PRO-Setup-v1.7.2.exe"
 
@@ -12,7 +12,7 @@ Write-Host "=== STEP 1: SECURITY AUDIT & PRE-BUILD CHECKS ===" -ForegroundColor 
 
 # 1. Search for credentials/keys
 Write-Host "Scanning app directory for .env, .key, and token files..."
-$suspiciousFiles = Get-ChildItem -Path (Join-Path $projectRoot "$PLUGINSDIR\app-64\resources\app") -Recurse -Include *.env, *.key, *.token, *secret* -ErrorAction SilentlyContinue
+$suspiciousFiles = Get-ChildItem -Path (Join-Path $projectRoot '`$PLUGINSDIR\app-64\resources\app') -Recurse -Include *.env, *.key, *.token, *secret* -ErrorAction SilentlyContinue
 if ($suspiciousFiles) {
     Write-Host "[WARNING] Suspicious files found:" -ForegroundColor Yellow
     $suspiciousFiles | ForEach-Object { Write-Host " - $_.FullName" }

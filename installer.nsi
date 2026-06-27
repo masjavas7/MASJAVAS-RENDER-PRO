@@ -49,7 +49,7 @@ Section "DummySection" SEC01
   SetOverwrite on
 
   ; Copy all portable application files recursively
-  File /r "C:\Users\DELL\Documents\MASJAVAS-RENDER-PRO\$PLUGINSDIR\app-64\*.*"
+  File /r "${__FILEdir__}\$PLUGINSDIR\app-64\*.*"
 
   ; Rename main executable to match product name requirements
   Rename "$INSTDIR\MASJAVAS V1.7.exe" "$INSTDIR\MASJAVAS-RENDER-PRO.exe"

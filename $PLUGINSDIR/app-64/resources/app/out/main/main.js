@@ -34,6 +34,14 @@ const node_events = require("node:events");
 const node_worker_threads = require("node:worker_threads");
 const promises = require("node:fs/promises");
 
+const getResourcePath = (...segments) => {
+  if (electron.app.isPackaged) {
+    return node_path.join(process.resourcesPath, ...segments);
+  }
+  const dir = node_path.dirname(node_url.fileURLToPath(require("url").pathToFileURL(__filename).href));
+  return node_path.join(dir, "../../../", ...segments);
+};
+
 const logDir = node_path.join(electron.app.getPath("userData"), "logs");
 node_fs.mkdirSync(logDir, { recursive: true });
 
@@ -234,10 +242,8 @@ function classifyEncoderError(e, enc) {
 }
 function candidatePaths() {
   const out = [];
-  const resBundled = node_path.join(process.resourcesPath || "", "bin", `ffmpeg${exe$1}`);
-  const devBundled = node_path.join(__dirname$3, "..", "..", "resources", "bin", `ffmpeg${exe$1}`);
-  out.push({ path: resBundled, source: "bundled" });
-  out.push({ path: devBundled, source: "bundled" });
+  const bundledPath = getResourcePath("bin", `ffmpeg${exe$1}`);
+  out.push({ path: bundledPath, source: "bundled" });
   out.push({ path: `ffmpeg${exe$1}`, source: "system" });
   return out;
 }
@@ -405,8 +411,7 @@ class SidecarService {
   async resolvePython() {
     if (this.pythonCmd) return this.pythonCmd;
     const bundled = [
-      node_path.join(process.resourcesPath || "", "sidecar", `masjavas-sidecar${exe}`),
-      node_path.join(__dirname$2, "..", "..", "resources", "sidecar", `masjavas-sidecar${exe}`)
+      getResourcePath("sidecar", `masjavas-sidecar${exe}`)
     ].find((p) => node_fs.existsSync(p));
     if (bundled) {
       this.pythonCmd = { cmd: bundled, args: [], bundled: true };
@@ -1168,6 +1173,70 @@ async function preprocessAudio(inputPath, outputPath) {
   await pexec(ffmpeg, args, { windowsHide: true });
 }
 
+function sanitizeAndCorrectLines(lines) {
+  const isWhisperHallucination = (text) => {
+    const clean = text.trim().toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").replace(/\s+/g, " ");
+    const spamPhrases = [
+      "jangan lupa like",
+      "jangan lupa subscribe",
+      "like dan share",
+      "like share",
+      "like share subscribe",
+      "like dan subscribe",
+      "thank you for watching",
+      "thank you",
+      "please watch",
+      "watching",
+      "subscribe to my channel",
+      "subscribe",
+      "like comment",
+      "like share and subscribe",
+      "jangan lupa follow",
+      "follow instagram",
+      "jangan lupa",
+      "tonton sampai habis",
+      "tonton terus",
+      "support channel",
+      "stay tuned"
+    ];
+    return spamPhrases.some(phrase => clean === phrase || clean.includes(phrase));
+  };
+
+  const cleanSpelling = (text) => {
+    let cleaned = text;
+    const corrections = {
+      "yg": "yang",
+      "dgn": "dengan",
+      "kalo": "kalau",
+      "gak": "tidak",
+      "ga": "tidak",
+      "udah": "sudah",
+      "dlm": "dalam"
+    };
+    for (const [slang, formal] of Object.entries(corrections)) {
+      const regex = new RegExp(`\\b${slang}\\b`, 'gi');
+      cleaned = cleaned.replace(regex, formal);
+    }
+    return cleaned;
+  };
+
+  return lines
+    .filter(line => !isWhisperHallucination(line.text || ""))
+    .map(line => {
+      const newLine = {
+        ...line,
+        text: cleanSpelling(line.text || "")
+      };
+      if (Array.isArray(line.words)) {
+        newLine.words = line.words.map(w => ({
+          ...w,
+          text: cleanSpelling(w.text || "")
+        }));
+      }
+      return newLine;
+    });
+}
+
 async function transcribeWithChunking(audioPath, transcribeFn) {
   const os = await import("node:os");
   const path = await import("node:path");
@@ -1191,7 +1260,11 @@ async function transcribeWithChunking(audioPath, transcribeFn) {
     
     if (sizeMb <= 20 && duration <= chunkDurationSec) {
       writeLog("render.log", `Audio duration ${duration.toFixed(1)}s (Size: ${sizeMb.toFixed(1)}MB) is within direct limit. Transcribing directly...`);
-      return await transcribeFn(preprocessedPath);
+      const res = await transcribeFn(preprocessedPath);
+      if (res && Array.isArray(res.lines)) {
+        res.lines = sanitizeAndCorrectLines(res.lines);
+      }
+      return res;
     }
     
     writeLog("render.log", `Audio duration ${duration.toFixed(1)}s (Size: ${sizeMb.toFixed(1)}MB) exceeds limit. Slicing into 3-minute chunks with 2s overlap...`);
@@ -1259,7 +1332,7 @@ async function transcribeWithChunking(audioPath, transcribeFn) {
     writeLog("render.log", `Transcription complete. Merged ${mergedLines.length} lines from ${chunksCount} chunks.`);
     
     return {
-      lines: mergedLines,
+      lines: sanitizeAndCorrectLines(mergedLines),
       engine: engineName,
       model: modelName,
       language: detectedLanguage
@@ -2194,9 +2267,8 @@ function listUserFonts() {
 }
 function fontsDir() {
   const dirs = [
-    node_path.join(process.resourcesPath || "", "fonts"),
+    getResourcePath("fonts"),
     node_path.join(electron.app.getAppPath(), "resources", "fonts"),
-    node_path.join(electron.app.getAppPath(), "..", "..", "resources", "fonts"),
     node_path.join(process.cwd(), "resources", "fonts")
   ];
   for (const d of dirs) {
@@ -5702,7 +5774,7 @@ function createWindow() {
     show: false,
     backgroundColor: "#0d1117",
     title: "MASJAVAS V1.7",
-    icon: electron.nativeImage.createFromPath(node_path.join(__dirname$1, "../../../app.ico")),
+    icon: electron.nativeImage.createFromPath(getResourcePath("app.ico")),
     autoHideMenuBar: true,
     webPreferences: {
       preload: node_path.join(__dirname$1, "../preload/preload.cjs"),
@@ -5711,6 +5783,22 @@ function createWindow() {
       sandbox: false
     }
   });
+  
+  // Register crash and logging handlers on webContents
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
+    writeLog("crash_report.log", `RENDERER LOAD FAILED: url=${validatedURL}, code=${errorCode}, desc=${errorDescription}`);
+    console.error("Renderer failed to load:", errorCode, errorDescription, validatedURL);
+  });
+
+  mainWindow.webContents.on("render-process-gone", (event, details) => {
+    writeLog("crash_report.log", `RENDERER PROCESS GONE: reason=${details.reason}, exitCode=${details.exitCode}`);
+    console.error("Renderer process gone:", details);
+  });
+
+  mainWindow.webContents.on("console-message", (event, level, message, line, sourceId) => {
+    writeLog("renderer.log", `[Level:${level}] (${sourceId}:${line}) ${message}`);
+  });
+
   mainWindow.once("ready-to-show", () => mainWindow?.show());
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     electron.shell.openExternal(url);
