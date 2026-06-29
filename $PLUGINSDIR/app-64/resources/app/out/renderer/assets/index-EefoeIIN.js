@@ -12849,10 +12849,6 @@ function PreviewPanel() {
     ).then((arr) => {
       if (!cancelled) {
         const loaded2 = arr.filter(Boolean);
-        for (let i = loaded2.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [loaded2[i], loaded2[j]] = [loaded2[j], loaded2[i]];
-        }
         setFootageImgs(loaded2);
       }
     });
@@ -13216,20 +13212,57 @@ function PreviewPanel() {
         }
       }
       if (imgs.length) {
-        const per = Math.max(2, dur / imgs.length);
-        const idx = Math.min(imgs.length - 1, Math.floor(t2 / per));
-        const item = imgs[idx];
+        const schedulerMode = proj.footage.scheduler || (proj.footage.randomCount === 1 ? "single" : "sequential");
+        let order = [...imgs];
+        if (schedulerMode === "single") {
+          order = [imgs[0]];
+        } else {
+          if (proj.footage.order && proj.footage.order.length) {
+            order = proj.footage.order.map((p) => imgs.find((it) => it.path === p)).filter(Boolean);
+          }
+          if (!order.length) order = [...imgs];
+        }
+
+        let currentItem = null;
+        let segmentStart = 0;
+        let t = 0;
+        let idx = 0;
+        let i = 0;
+        while (t <= t2 && order.length > 0 && i < 2000) {
+          const it = order[i % order.length];
+          const itemDur = it.video ? (it.video.duration || 10) : 30;
+          if (t2 >= t && t2 < t + itemDur) {
+            currentItem = it;
+            segmentStart = t;
+            idx = i % order.length;
+            break;
+          }
+          t += itemDur;
+          i++;
+        }
+        if (!currentItem && order.length > 0) {
+          currentItem = order[0];
+          segmentStart = 0;
+          idx = 0;
+        }
+        const item = currentItem;
+
         if (item.video) {
           const v2 = item.video;
-          if (!isRenderingRef.current && v2.paused) v2.play().catch(() => {
-          });
+          if (!isRenderingRef.current && v2.paused) v2.play().catch(() => {});
+          
+          const targetTime = (t2 - segmentStart) % (v2.duration || 10);
+          if (Math.abs(v2.currentTime - targetTime) > 0.15) {
+            try { v2.currentTime = targetTime; } catch (_) {}
+          }
+
           if (v2.videoWidth) drawFootageWithMode(ctx, v2, W2, H2, proj);
           else {
             ctx.fillStyle = "#111";
             ctx.fillRect(0, 0, W2, H2);
           }
           for (let k2 = 0; k2 < imgs.length; k2++) {
-            if (k2 !== idx && imgs[k2].video && !imgs[k2].video.paused) imgs[k2].video.pause();
+            if (imgs[k2] !== item && imgs[k2].video && !imgs[k2].video.paused) imgs[k2].video.pause();
           }
         } else if (item.img) {
           drawFootageWithMode(ctx, item.img, W2, H2, proj);
@@ -14211,6 +14244,13 @@ function applyResolution(exp, height, aspect) {
 function pickFootageOrder(project) {
   const f2 = project.footage;
   if (!f2.items.length) return [];
+  const schedulerMode = f2.scheduler || (f2.randomCount === 1 ? "single" : (f2.randomCount >= f2.items.length ? "sequential" : "shuffle"));
+  if (schedulerMode === "single") {
+    return [f2.items[0].path];
+  }
+  if (schedulerMode === "sequential") {
+    return f2.items.map((i) => i.path);
+  }
   const pinned = f2.pinned.filter((p2) => f2.items.some((i) => i.path === p2));
   const pool = f2.items.map((i) => i.path).filter((p2) => !pinned.includes(p2));
   for (let i = pool.length - 1; i > 0; i--) {

@@ -756,7 +756,8 @@ class ProjectService {
         beatEffectIntensity: 0.6,
         seamlessLoop: false,
         muteFootageAudio: true,
-        footageVolume: 1
+        footageVolume: 1,
+        scheduler: "sequential"
       },
       audio: {
         source: "folder",
@@ -1084,8 +1085,8 @@ class ProbeService {
     const args = [
       "-v",
       "error",
-      "-show_entries",
-      "format=duration:stream=width,height,codec_type",
+      "-show_format",
+      "-show_streams",
       "-of",
       "json",
       path
@@ -1094,12 +1095,38 @@ class ProbeService {
     const data = JSON.parse(stdout);
     const v = data.streams?.find((s) => s.codec_type === "video");
     const a = data.streams?.find((s) => s.codec_type === "audio");
+    
+    let fps = 30;
+    if (v && v.r_frame_rate) {
+      const parts = v.r_frame_rate.split("/");
+      if (parts.length === 2) {
+        const num = parseFloat(parts[0]);
+        const den = parseFloat(parts[1]);
+        if (den > 0) fps = num / den;
+      } else {
+        fps = parseFloat(v.r_frame_rate) || 30;
+      }
+    }
+    
+    let rotation = 0;
+    if (v && v.tags && v.tags.rotate) {
+      rotation = parseInt(v.tags.rotate, 10) || 0;
+    } else if (v && v.side_data_list) {
+      const sd = v.side_data_list.find(s => s.rotation !== undefined);
+      if (sd) rotation = sd.rotation;
+    }
+
     const result = {
       duration: parseFloat(data.format?.duration || "0") || 0,
-      width: v?.width,
-      height: v?.height,
+      width: v?.width || 0,
+      height: v?.height || 0,
+      fps,
+      frameCount: parseInt(v?.nb_frames, 10) || 0,
+      rotation,
+      codec: v?.codec_name || "",
       hasVideo: !!v,
-      hasAudio: !!a
+      hasAudio: !!a,
+      audioCodec: a?.codec_name || ""
     };
     this.probeCache.set(path, result);
     if (this.probeCache.size > 200) {
@@ -4863,24 +4890,27 @@ class RenderService {
       }
       return { segments: segments2, order, beatSynced: false, baseDur, isImage: true };
     }
-    if (f.seamlessLoop ?? false) {
-      const clipDur = /* @__PURE__ */ new Map();
-      for (const p of order) clipDur.set(p, await this.safeDur(p));
-      const segments2 = [];
-      let t = 0;
-      let i = 0;
-      while (t < baseDur && segments2.length < 2e3) {
-        const path = order[i % order.length];
-        const full = Math.max(0.5, clipDur.get(path) ?? 8);
-        const dur = Math.min(full, baseDur - t);
-        segments2.push({ path, dur });
-        t += dur;
-        i++;
-      }
-      return { segments: segments2, order, beatSynced: false, baseDur, isImage: false };
+    const clipDur = /* @__PURE__ */ new Map();
+    for (const p of order) clipDur.set(p, await this.safeDur(p));
+    const segments2 = [];
+    let t = 0;
+    let i = 0;
+    
+    const schedulerMode = f.scheduler || (f.randomCount === 1 ? "single" : "sequential");
+    let actualOrder = [...order];
+    if (schedulerMode === "single" && order.length > 0) {
+      actualOrder = [order[0]];
     }
-    const segments = buildEvenSegments(order, baseDur);
-    return { segments, order, beatSynced: false, baseDur, isImage: false };
+
+    while (t < baseDur && segments2.length < 2e3) {
+      const path = actualOrder[i % actualOrder.length];
+      const full = Math.max(0.5, clipDur.get(path) ?? 10);
+      const dur = Math.min(full, baseDur - t);
+      segments2.push({ path, dur });
+      t += dur;
+      i++;
+    }
+    return { segments: segments2, order, beatSynced: false, baseDur, isImage: false };
   }
   /**
    * Pass-1 of the 2-pass render: encode just the footage base (no overlays/audio)
